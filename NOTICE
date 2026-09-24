@@ -1,0 +1,8 @@
+RevetSec Soklet Adapter
+Copyright 2026 Revetware LLC
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+This adapter has no bundled third-party code. It is used with RevetSec core
+(com.revetsec:revetsec) and Soklet (com.soklet:soklet), which the application
+declares and which carry their own notices.
