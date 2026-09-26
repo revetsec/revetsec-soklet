@@ -1,16 +1,16 @@
 # revetsec-soklet
 
-RevetSec helpers for [Soklet](https://www.soklet.com) applications.
+Revetsec helpers for [Soklet](https://www.soklet.com) applications.
 
 **This adapter is pre-release, and no adapter code exists yet.** The repository holds the build, contract tests and CI configuration. The version is `1.0.0-SNAPSHOT`, and there is no compatibility promise before 1.0.0.
 
 ### What Is It?
 
-[RevetSec](https://github.com/revetsec/revetsec) is a zero-dependency Java library for OAuth 2.0 clients and resource servers, OpenID Connect relying parties, JOSE, SAML 2.0 service providers and SCIM 2.0 servers. Its core has no framework dependency: it parses raw query strings, form bodies and header values.
+[Revetsec](https://github.com/revetsec/revetsec) is a zero-dependency Java library for OAuth 2.0 clients and resource servers, OpenID Connect relying parties, JOSE, SAML 2.0 service providers and SCIM 2.0 servers. Its core has no framework dependency: it parses raw query strings, form bodies and header values.
 
-This adapter connects the two. Its helpers pass a Soklet `Request` to RevetSec core as raw input, and turn RevetSec results into Soklet responses. They contain no protocol logic, and every validation decision is made by RevetSec core.
+This adapter connects the two. Its helpers pass a Soklet `Request` to Revetsec core as raw input, and turn Revetsec results into Soklet responses. They contain no protocol logic, and every validation decision is made by Revetsec core.
 
-The helpers are planned as static classes. These names come from RevetSec's planned API and may change before the classes exist:
+The helpers are planned as static classes. These names come from Revetsec's planned API and may change before the classes exist:
 
 - `SokletOAuth`: the authorization response of an OAuth or OpenID Connect callback, from a GET query or a POST form, and redirect responses with `Cache-Control: no-store` and `Referrer-Policy: no-referrer`
 - `SokletBearer`: a request's bearer token, for resource servers such as MCP endpoints
@@ -19,11 +19,11 @@ The helpers are planned as static classes. These names come from RevetSec's plan
 
 ### Installation
 
-Adapter 1.x requires RevetSec core 1.0.0 or later. JDK 17 or newer is required, with a minimum runtime of Java 17.0.3.
+Adapter 1.x requires Revetsec core 1.0.0 or later. JDK 17 or newer is required, with a minimum runtime of Java 17.0.3.
 
-RevetSec core and Soklet are `provided` dependencies of this adapter, so your application declares all three coordinates below. This adapter currently builds against Soklet 3.5.1. It moves to Soklet 4.0 if 4.0.0 is on Maven Central before this adapter's 1.0.0.
+Revetsec core and Soklet are `provided` dependencies of this adapter, so your application declares all three coordinates below. This adapter currently builds against Soklet 3.5.1. It moves to Soklet 4.0 if 4.0.0 is on Maven Central before this adapter's 1.0.0.
 
-**Nothing has been published yet, including snapshots.** Until the first release, install RevetSec core and then this adapter into your local Maven repository from their source checkouts:
+**Nothing has been published yet, including snapshots.** Until the first release, install Revetsec core and then this adapter into your local Maven repository from their source checkouts:
 
 ```shell
 $ mvn -B -ntp -f revetsec/pom.xml -DskipTests -Dmaven.javadoc.skip=true install
@@ -69,15 +69,15 @@ dependencies {
 
 ### Status
 
-This adapter is **pre-release**, like RevetSec core. The repository currently holds the build, contract tests and CI configuration (milestone M0). Its helpers are written after the core APIs they call.
+This adapter is **pre-release**, like Revetsec core. The repository currently holds the build, contract tests and CI configuration (milestone M0). Its helpers are written after the core APIs they call.
 
-RevetSec has not been independently audited. That includes this adapter. Its security evidence is meant to be reproducible by anyone and will be listed in the [`docs/`](https://github.com/revetsec/revetsec/tree/main/docs) directory of the core repository as it is produced. None of it exists yet.
+Revetsec has not been independently audited. That includes this adapter. Its security evidence is meant to be reproducible by anyone and will be listed in the [`docs/`](https://github.com/revetsec/revetsec/tree/main/docs) directory of the core repository as it is produced. None of it exists yet.
 
 To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ### Development Verification
 
-This adapter builds against RevetSec core from source. With `JAVA_HOME` pointing at JDK 17 or newer, and the core repository checked out next to this one:
+This adapter builds against Revetsec core from source. With `JAVA_HOME` pointing at JDK 17 or newer, and the core repository checked out next to this one:
 
 ```shell
 $ mvn -B -ntp -f ../revetsec/pom.xml -DskipTests -Dmaven.javadoc.skip=true install

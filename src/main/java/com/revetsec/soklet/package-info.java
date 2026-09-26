@@ -15,13 +15,13 @@
  */
 
 /**
- * RevetSec helpers for <a href="https://www.soklet.com">Soklet</a> applications.
+ * Revetsec helpers for <a href="https://www.soklet.com">Soklet</a> applications.
  * <p>
- * The helpers are static classes. They pass a Soklet {@code Request} to RevetSec core as raw input (query string,
- * form body, header values) and turn RevetSec results into Soklet responses. They contain no protocol logic: every
- * validation decision is made by RevetSec core, through its public API only.
+ * The helpers are static classes. They pass a Soklet {@code Request} to Revetsec core as raw input (query string,
+ * form body, header values) and turn Revetsec results into Soklet responses. They contain no protocol logic: every
+ * validation decision is made by Revetsec core, through its public API only.
  * <p>
- * RevetSec core and Soklet are {@code provided} dependencies of this adapter, so an application declares both.
+ * Revetsec core and Soklet are {@code provided} dependencies of this adapter, so an application declares both.
  *
  * @author <a href="https://www.revetkn.com">Mark Allen</a>
  */
