@@ -18,11 +18,10 @@ env:
   # ==================================================================================================
   # PINNED REVETSEC CORE COMMIT: the full 40-character SHA of a pushed revetsec/revetsec commit.
   #
-  # PLACEHOLDER: the 40 zeros below mean "not pinned yet", because core has no commit to pin. After the
-  # first core commit is pushed, replace them with that commit's SHA. Until then every job fails at its
-  # "Validate the core pin" step, on purpose.
+  # This pushed phase1 commit contains every raw-input API used by these helpers. The current
+  # resource-validator increment is tested separately against its recorded working source.
   # ==================================================================================================
-  REVETSEC_CORE_SHA: 'a70e7bb796e67f3f0bfcb76472d57abda39ed792'
+  REVETSEC_CORE_SHA: '10e04e1cdbd1549759b544143430a4b350276187'
 
 permissions:
   contents: read
@@ -114,8 +113,7 @@ jobs:
           --core-directory core
           --adapter-directory adapter
 
-  # Gating. Tier 0 only: the contract tests and ClaimsLintTests run inside `verify`. Javadoc is skipped until
-  # this adapter has its first public type.
+  # Gating. Contract and helper tests run inside verify; the separate Javadoc job uses its pinned compiler.
   test:
     name: Test (JDK ${{ matrix.jdk }})
     runs-on: ubuntu-24.04
@@ -223,3 +221,61 @@ jobs:
 
       - name: Error Prone, NullAway, SpotBugs and FindSecBugs
         run: mvn -B -ntp -f adapter/pom.xml -Dmaven.javadoc.skip=true -Pstatic-analysis,spotbugs verify
+
+  javadoc:
+    name: Javadoc (Corretto 26)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out revetsec-soklet
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: adapter
+          persist-credentials: false
+
+      - name: Validate the core pin
+        run: |
+          if [[ "$REVETSEC_CORE_SHA" =~ ^0{40}$ ]]; then
+            echo "::error::Revetsec core pin is unset."
+            exit 1
+          fi
+          if [[ ! "$REVETSEC_CORE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Revetsec core pin must be a full lowercase SHA."
+            exit 1
+          fi
+
+      - name: Check out Revetsec core at the pin
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: revetsec/revetsec
+          ref: ${{ env.REVETSEC_CORE_SHA }}
+          path: core
+          persist-credentials: false
+
+      - name: Set up Corretto 17 for Maven
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: corretto
+          java-version: '17'
+          cache: maven
+
+      - name: Install checksum-pinned Corretto 26 for Javadoc
+        run: >-
+          bash adapter/.github/scripts/install-pinned-corretto-linux-x64.sh
+          javadocJava "$RUNNER_TEMP" "$GITHUB_ENV"
+          "$RUNNER_TEMP/adapter-javadoc-java-distribution.txt"
+
+      - name: Remove cached Revetsec artifacts
+        run: rm -rf ~/.m2/repository/com/revetsec
+
+      - name: Build and install pinned core with its documentation index
+        run: >-
+          mvn -B -ntp -f core/pom.xml -DskipTests
+          -Dmaven.javadoc.failOnWarnings=true clean install
+
+      - name: Build warnings-fatal adapter Javadoc
+        run: >-
+          mvn -B -ntp -f adapter/pom.xml -DskipTests
+          -Dmaven.javadoc.failOnWarnings=true
+          -Drevetsec.core.javadoc.location="$GITHUB_WORKSPACE/core/target/reports/apidocs"
+          clean verify

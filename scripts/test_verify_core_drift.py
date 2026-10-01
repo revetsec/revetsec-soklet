@@ -243,15 +243,27 @@ class WorkflowTests(unittest.TestCase):
                 if "-f core/pom.xml" in job:
                     self.assertLess(job.index("rm -rf ~/.m2/repository/com/revetsec"), job.index("-f core/pom.xml"))
                     self.assertLess(job.index("-f core/pom.xml"), job.index("-f adapter/pom.xml"))
-        self.assertEqual(3, core_jobs)
+        self.assertEqual(4, core_jobs)
 
     def test_core_is_installed_without_tests_or_javadoc(self):
-        installs = re.findall(r"mvn [^\n]*-f core/pom\.xml[^\n]*", self.workflow)
+        ordinary_jobs = "\n".join(self.jobs()[name] for name in ["test", "static-analysis"])
+        installs = re.findall(r"mvn [^\n]*-f core/pom\.xml[^\n]*", ordinary_jobs)
         self.assertEqual(2, len(installs))
         for install in installs:
             self.assertIn("-DskipTests", install)
             self.assertIn("-Dmaven.javadoc.skip=true", install)
             self.assertTrue(install.endswith(" install"), install)
+
+    def test_javadoc_builds_core_index_with_pinned_compiler(self):
+        job = self.jobs()["javadoc"]
+        self.assertIn("install-pinned-corretto-linux-x64.sh", job)
+        self.assertIn('javadocJava "$RUNNER_TEMP" "$GITHUB_ENV"', job)
+        self.assertIn("-DskipTests", job)
+        self.assertEqual(2, job.count("-Dmaven.javadoc.failOnWarnings=true"))
+        self.assertNotIn("-Dmaven.javadoc.skip=true", job)
+        self.assertIn("-f core/pom.xml", job)
+        self.assertIn("clean install", job)
+        self.assertIn("$GITHUB_WORKSPACE/core/target/reports/apidocs", job)
 
     def test_never_overrides_the_declared_core_version(self):
         self.assertNotIn("-Drevetsec.version", self.workflow)

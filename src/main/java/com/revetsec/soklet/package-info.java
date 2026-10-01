@@ -21,9 +21,15 @@
  * form body, header values) and turn Revetsec results into Soklet responses. They contain no protocol logic: every
  * validation decision is made by Revetsec core, through its public API only.
  * <p>
+ * {@link com.revetsec.soklet.SokletOAuth} handles raw GET and form-post callbacks plus trusted redirects;
+ * {@link com.revetsec.soklet.SokletBearer} collects raw Authorization values. Soklet's header sets cannot preserve
+ * identical physical duplicate values, including differently cased field names. A trusted edge must reject those
+ * duplicates. These helpers preserve every distinct materialized value and never reconstruct discarded multiplicity.
+ * <p>
  * Revetsec core and Soklet are {@code provided} dependencies of this adapter, so an application declares both.
  *
  * @author <a href="https://www.revetkn.com">Mark Allen</a>
+ * @since 1.0.0
  */
 @NullMarked
 package com.revetsec.soklet;

@@ -25,11 +25,12 @@
     },
     {
       "path": "soklet-3.5.1/element-list",
-      "url": "https://javadoc.io/static/com.soklet/soklet/3.5.1/",
-      "sha256": "ee8ef2aa45869142cb3fcd5f5c46ede1bcf1acaa03e043992bdf2d0e12d28794",
+      "url": "https://javadoc.io/static/com.soklet/soklet/3.5.1/com.soklet/",
+      "sha256": "91357759feeb990d128732f2ea22f15318ef9b17cac53b701619cb66209ceba8",
       "upstreamIndexSha256": "ee8ef2aa45869142cb3fcd5f5c46ede1bcf1acaa03e043992bdf2d0e12d28794",
       "archiveSha256": "68d04596bcb0c2fd2fb9a70912d36041566c6fcbd252cfcfa4a0957e994fc318",
-      "source": "https://repo.maven.apache.org/maven2/com/soklet/soklet/3.5.1/soklet-3.5.1-javadoc.jar"
+      "source": "https://repo.maven.apache.org/maven2/com/soklet/soklet/3.5.1/soklet-3.5.1-javadoc.jar",
+      "normalization": "Removed module header for legacy classpath Javadoc; URL includes upstream module path."
     }
   ]
 }

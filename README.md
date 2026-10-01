@@ -2,7 +2,7 @@
 
 Revetsec helpers for [Soklet](https://www.soklet.com) applications.
 
-**This adapter is pre-release, and no adapter code exists yet.** The repository holds the build, contract tests and CI configuration. The version is `1.0.0-SNAPSHOT`, and there is no compatibility promise before 1.0.0.
+**This adapter is pre-release.** OAuth callback/redirect and bearer parsing helpers are implemented; SAML and SCIM helpers remain planned. The version is `1.0.0-SNAPSHOT`, and there is no compatibility promise before 1.0.0.
 
 ### What Is It?
 
@@ -10,12 +10,21 @@ Revetsec helpers for [Soklet](https://www.soklet.com) applications.
 
 This adapter connects the two. Its helpers pass a Soklet `Request` to Revetsec core as raw input, and turn Revetsec results into Soklet responses. They contain no protocol logic, and every validation decision is made by Revetsec core.
 
-The helpers are planned as static classes. These names come from Revetsec's planned API and may change before the classes exist:
+Implemented static helpers:
 
 - `SokletOAuth`: the authorization response of an OAuth or OpenID Connect callback, from a GET query or a POST form, and redirect responses with `Cache-Control: no-store` and `Referrer-Policy: no-referrer`
 - `SokletBearer`: a request's bearer token, for resource servers such as MCP endpoints
-- `SokletSaml`: the message of a SAML HTTP-POST binding request, and the redirect or auto-submitting form response that sends one
-- `SokletScim`: a SCIM request's query, body and precondition headers, and the Soklet response for a SCIM result
+SAML HTTP-POST and SCIM helpers remain later milestone work.
+
+### Usage
+
+```java
+AuthorizationResponse callback = SokletOAuth.authorizationResponseFor(request);
+Optional<BearerToken> bearer = SokletBearer.bearerTokenFor(request);
+Response redirect = SokletOAuth.redirect(authorizationUri, responseCookies);
+```
+
+The callback helper accepts GET or form POST and preserves a POST query alongside its raw body. Unsupported methods are app misuse. Configure trusted callback/provider URLs in the application. Pass the parsed callback and bound pending reference to the configured OAuth/OIDC client. A parsed bearer still requires access-token validation and an application permission check.
 
 ### Installation
 
@@ -69,9 +78,13 @@ dependencies {
 
 ### Status
 
-This adapter is **pre-release**, like Revetsec core. The repository currently holds the build, contract tests and CI configuration (milestone M0). Its helpers are written after the core APIs they call.
+This adapter is **pre-release**, like Revetsec core. The helpers use only public Revetsec APIs. OAuth callbacks retain raw query/body text and every distinct materialized Content-Type value. Bearer parsing retains every distinct materialized Authorization value and rejects ambiguity in core; it grants no identity or permission. Applications select validators and make scope/authorization decisions.
 
-Revetsec has not been independently audited. That includes this adapter. Its security evidence is meant to be reproducible by anyone and will be listed in the [`docs/`](https://github.com/revetsec/revetsec/tree/main/docs) directory of the core repository as it is produced. None of it exists yet.
+Soklet represents header values as sets. Identical duplicate physical fields can be discarded before these helpers run, including fields with differently cased names. Your trusted HTTP edge must reject those duplicate Authorization and Content-Type fields; the adapter cannot recover discarded multiplicity.
+
+Redirect helpers accept an absolute HTTP(S) URI without userinfo, reject unsafe URI text, and return 302 with no-store/no-referrer headers and optional application cookies. The app supplies the redirect URI. Core chooses and validates provider endpoints.
+
+Revetsec has not been independently audited. That includes this adapter. Its security evidence is meant to be reproducible by anyone and will be listed in the [`docs/`](https://github.com/revetsec/revetsec/tree/main/docs) directory of the core repository as it is produced. Current evidence records its exact implementation and provider scope; later milestones remain in progress.
 
 To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
