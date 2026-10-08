@@ -18,10 +18,10 @@ env:
   # ==================================================================================================
   # PINNED REVETSEC CORE COMMIT: the full 40-character SHA of a pushed revetsec/revetsec commit.
   #
-  # This pushed phase1 commit contains every raw-input API used by these helpers. The current
-  # resource-validator increment is tested separately against its recorded working source.
+  # This pushed commit contains the resource-validator and authorization-server APIs used by
+  # these helpers, including the self-issued example.
   # ==================================================================================================
-  REVETSEC_CORE_SHA: '10e04e1cdbd1549759b544143430a4b350276187'
+  REVETSEC_CORE_SHA: 'd932c67594e608e457707946e903fb0b4edaaf1d'
 
 permissions:
   contents: read

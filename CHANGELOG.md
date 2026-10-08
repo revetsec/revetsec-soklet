@@ -4,6 +4,9 @@ All notable changes to revetsec-soklet are recorded in this file.
 
 Each release gets a `## X.Y.Z (YYYY-MM-DD)` heading with Added, Changed, Fixed, Security and Migration Notes sections as needed. A security fix names its GHSA or CVE ID. Each release also states the minimum Revetsec core and Soklet versions it requires.
 
+- Raised the provided Soklet baseline to 4.0.0.
+- Added `SokletOAuthAuthorizationServer` raw issuer request helpers and exact-byte prepared response mapping.
+
 ## Unreleased
 
 Nothing has been released. The version is `1.0.0-SNAPSHOT`, and there is no compatibility promise before 1.0.0.

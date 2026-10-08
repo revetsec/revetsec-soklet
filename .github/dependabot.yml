@@ -13,8 +13,8 @@ updates:
       # Core is built from the commit pinned in .github/workflows/ci.yml (REVETSEC_CORE_SHA), not
       # resolved from a repository, and scripts/verify-core-drift.py ties revetsec.version to it.
       - dependency-name: "com.revetsec:revetsec"
-    # com.soklet:soklet is deliberately not ignored: a PR proposing 4.0.0 is the signal that Soklet 4.0.0
-    # is on Maven Central, when this adapter moves from Soklet 3.5.1 (plan §10.1). Review it by hand.
+    # com.soklet:soklet is deliberately not ignored: 4.0.0 is the owner-approved baseline.
+    # Review later framework updates by hand.
 
   - package-ecosystem: github-actions
     directory: "/"

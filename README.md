@@ -2,7 +2,7 @@
 
 Revetsec helpers for [Soklet](https://www.soklet.com) applications.
 
-**This adapter is pre-release.** OAuth callback/redirect and bearer parsing helpers are implemented; SAML and SCIM helpers remain planned. The version is `1.0.0-SNAPSHOT`, and there is no compatibility promise before 1.0.0.
+**This adapter is pre-release.** OAuth callback/redirect, bearer parsing and issuer transport helpers are implemented; SAML and SCIM helpers remain planned. The version is `1.0.0-SNAPSHOT`, and there is no compatibility promise before 1.0.0.
 
 ### What Is It?
 
@@ -14,6 +14,8 @@ Implemented static helpers:
 
 - `SokletOAuth`: the authorization response of an OAuth or OpenID Connect callback, from a GET query or a POST form, and redirect responses with `Cache-Control: no-store` and `Referrer-Policy: no-referrer`
 - `SokletBearer`: a request's bearer token, for resource servers such as MCP endpoints
+- `SokletOAuthAuthorizationServer`: raw authorization, token, revocation and introspection input and exact-byte core response mapping
+
 SAML HTTP-POST and SCIM helpers remain later milestone work.
 
 ### Usage
@@ -30,7 +32,7 @@ The callback helper accepts GET or form POST and preserves a POST query alongsid
 
 Adapter 1.x requires Revetsec core 1.0.0 or later. JDK 17 or newer is required, with a minimum runtime of Java 17.0.3.
 
-Revetsec core and Soklet are `provided` dependencies of this adapter, so your application declares all three coordinates below. This adapter currently builds against Soklet 3.5.1. It moves to Soklet 4.0 if 4.0.0 is on Maven Central before this adapter's 1.0.0.
+Revetsec core and Soklet are `provided` dependencies of this adapter, so your application declares all three coordinates below. This adapter requires Soklet 4.0.0 or later. Until its release is available on Maven Central, use the pinned 4.0.0 framework artifact for local builds. The recorded 3.5.1 offline Javadoc index covers only the existing common transport types and is not the runtime baseline.
 
 **Nothing has been published yet, including snapshots.** Until the first release, install Revetsec core and then this adapter into your local Maven repository from their source checkouts:
 
@@ -55,7 +57,7 @@ $ mvn -B -ntp -f revetsec-soklet/pom.xml -Dmaven.javadoc.skip=true install
 <dependency>
   <groupId>com.soklet</groupId>
   <artifactId>soklet</artifactId>
-  <version>3.5.1</version>
+  <version>4.0.0</version>
 </dependency>
 ```
 
@@ -72,7 +74,7 @@ repositories {
 dependencies {
   implementation 'com.revetsec:revetsec-soklet:1.0.0-SNAPSHOT'
   implementation 'com.revetsec:revetsec:1.0.0-SNAPSHOT'
-  implementation 'com.soklet:soklet:3.5.1'
+  implementation 'com.soklet:soklet:4.0.0'
 }
 ```
 
@@ -103,3 +105,19 @@ $ python3 scripts/verify-core-drift.py --core-directory ../revetsec
 ### License
 
 [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+
+### OAuth issuance
+
+`SokletOAuthAuthorizationServer` is stateless transport glue for an application-routed core `OAuthAuthorizationServer`. The application owns route/issuer association, TLS, physical duplicate rejection/framing limits, browser sessions, authentication, CSRF, consent and persistence. Core retains protocol/state rules. Helpers preserve raw query/body bytes and every distinct materialized header occurrence.
+
+```java
+OAuthAuthorizationResult result = SokletOAuthAuthorizationServer.beginAuthorizationResultFor(server, request, browserBinding);
+OAuthTokenResult token = SokletOAuthAuthorizationServer.tokenResultFor(server, request);
+OAuthRevocationResult revoked = SokletOAuthAuthorizationServer.revocationResultFor(server, request);
+OAuthIntrospectionResult checked = SokletOAuthAuthorizationServer.introspectionResultFor(server, request);
+MarshaledResponse response = SokletOAuthAuthorizationServer.responseFor(preparedCoreResponse);
+```
+
+Use each helper on its configured route. Render interactions in the app and call core directly to resume/complete consent. Metadata/JWKS use `responseFor(server.metadataResponse(method))` and `responseFor(server.jsonWebKeySetResponse(method))`. Expected failures remain core results; typed infrastructure failures propagate for mapping with `server.responseForFailure(failure)`.
+
+`responseFor` preserves prepared bytes/status/headers and optional credential-bearing Location, bypassing JSON marshalling. Add app cookies separately and keep credential-bearing responses out of diagnostics. Header sets lose identical physical duplicates, including mixed-case names; reject forbidden physical duplicates and incomplete/oversized requests at the trusted edge. See core's unpublished self-issued MCP example for app-owned authentication and explicit volatile-storage qualification.
