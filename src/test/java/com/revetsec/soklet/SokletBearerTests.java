@@ -47,8 +47,8 @@ final class SokletBearerTests {
 	@Test
 	void queryBodyAndCookiesNeverSupplyCredentials() {
 		Request request = Request.withRawUrl(HttpMethod.POST, "/resource?access_token=synthetic-query")
-				.headers(Map.of("Content-Type", Set.of("application/x-www-form-urlencoded"),
-						"Cookie", Set.of("access_token=synthetic-cookie")))
+				.headers(Map.of("Content-Type", List.of("application/x-www-form-urlencoded"),
+						"Cookie", List.of("access_token=synthetic-cookie")))
 				.body("access_token=synthetic-body".getBytes(StandardCharsets.UTF_8)).build();
 		assertTrue(SokletBearer.bearerTokenFor(request).isEmpty());
 	}
@@ -58,7 +58,7 @@ final class SokletBearerTests {
 		return Stream.of("Bearer synthetic", "bEaReR synthetic", "Bearer  synthetic", "Bearer " + " ".repeat(57) + "synthetic",
 				"Bearer A.Z-_/+~09==", "Bearer " + "a".repeat(65_536))
 				.map(field -> DynamicTest.dynamicTest("valid field length " + field.length(), () -> {
-					BearerToken token = SokletBearer.bearerTokenFor(request("aUtHoRiZaTiOn", Set.of(field))).orElseThrow();
+					BearerToken token = SokletBearer.bearerTokenFor(request("aUtHoRiZaTiOn", List.of(field))).orElseThrow();
 					assertEquals("BearerToken{value=<redacted>}", token.toString());
 					assertFalse(token.toString().contains("synthetic"));
 				}));
@@ -71,12 +71,12 @@ final class SokletBearerTests {
 				"Bearer synthetic\r\nInjected: value", "Bearer " + " ".repeat(58) + "synthetic",
 				"Bearer " + "a".repeat(65_537))
 				.map(field -> DynamicTest.dynamicTest("malformed field length " + field.length(),
-						() -> assertMalformed(request("Authorization", Set.of(field)))));
+						() -> assertMalformed(request("Authorization", List.of(field)))));
 	}
 
 	@Test
 	void distinctMaterializedAuthorizationValuesReject() {
-		assertMalformed(request("Authorization", Set.of("Bearer synthetic-a", "Bearer synthetic-b")));
+		assertMalformed(request("Authorization", List.of("Bearer synthetic-a", "Bearer synthetic-b")));
 	}
 
 	@Test
@@ -90,8 +90,8 @@ final class SokletBearerTests {
 	@Test
 	void unrelatedHeadersNeverBecomeAuthorization() {
 		Request request = Request.withRawUrl(HttpMethod.GET, "/resource")
-				.headers(Map.of("Proxy-Authorization", Set.of("Bearer synthetic"),
-						"X-Authorization", Set.of("Bearer synthetic"))).build();
+				.headers(Map.of("Proxy-Authorization", List.of("Bearer synthetic"),
+						"X-Authorization", List.of("Bearer synthetic"))).build();
 		assertTrue(SokletBearer.bearerTokenFor(request).isEmpty());
 	}
 
@@ -101,7 +101,7 @@ final class SokletBearerTests {
 		assertThrows(NullPointerException.class, () -> SokletBearer.bearerTokenFor(null));
 	}
 
-	private static @NonNull Request request(@NonNull String name, @NonNull Set<@NonNull String> values) {
+	private static @NonNull Request request(@NonNull String name, @NonNull List<@NonNull String> values) {
 		return Request.withRawUrl(HttpMethod.GET, "/resource").headers(Map.of(name, values)).build();
 	}
 

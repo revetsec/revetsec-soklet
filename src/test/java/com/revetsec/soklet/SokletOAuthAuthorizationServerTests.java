@@ -56,10 +56,10 @@ final class SokletOAuthAuthorizationServerTests {
   if(!failing) {assertEquals(OAuthStoreCommitStatus.COMMITTED,server.initializeFreshIssuer());server.establishNewSubject("subject");}
   return server;
  }
- private static @NonNull Request post(@NonNull String url,byte @NonNull [] body,@NonNull Map<@NonNull String,@NonNull Set<@NonNull String>> fields) {
+ private static @NonNull Request post(@NonNull String url,byte @NonNull [] body,@NonNull Map<@NonNull String,@NonNull List<@NonNull String>> fields) {
   return Request.withRawUrl(HttpMethod.POST,url).headers(fields).body(body).build();
  }
- private static @NonNull Map<@NonNull String,@NonNull Set<@NonNull String>> fields() {return Map.of("Content-Type",Set.of("application/x-www-form-urlencoded"));}
+ private static @NonNull Map<@NonNull String,@NonNull List<@NonNull String>> fields() {return Map.of("Content-Type",List.of("application/x-www-form-urlencoded"));}
  private static @NonNull Map<@NonNull String,@NonNull List<@NonNull String>> rawFields(@NonNull Request request) {
   Map<String,List<String>> out=new LinkedHashMap<>();request.getHeaders().forEach((k,v)->out.put(k,List.copyOf(v)));return out;
  }
@@ -96,7 +96,7 @@ final class SokletOAuthAuthorizationServerTests {
   assertInstanceOf(OAuthAuthorizationResult.Rejected.class,s.resumeAuthorizationResult(interaction.getInteractionValue(),"B".repeat(42)+"A"));
   var completed=assertInstanceOf(OAuthAuthorizationResult.Completed.class,s.completeAuthorizationResult(interaction.getInteractionValue(),BINDING,OAuthAuthorizationDecision.withSubject("subject").authorizedScopesByResource(Map.of(RESOURCE,Set.of("read"))).build()));
   var prepared=completed.getResponse();var response=SokletOAuthAuthorizationServer.responseFor(prepared);
-  assertEquals(303,response.getStatusCode());assertEquals(Set.of(prepared.getLocationWithCredentials().orElseThrow().toASCIIString()),response.getHeaders().get("Location"));assertArrayEquals(prepared.toHttpBodyWithCredentials(),body(response));
+  assertEquals(303,response.getStatusCode());assertEquals(List.of(prepared.getLocationWithCredentials().orElseThrow().toASCIIString()),response.getHeaders().get("Location"));assertArrayEquals(prepared.toHttpBodyWithCredentials(),body(response));
   assertTrue(Objects.requireNonNull(response.getHeaders().get("Location")).iterator().next().startsWith(REDIRECT+"&code="));
   String location=prepared.getLocationWithCredentials().orElseThrow().toString();String code=location.substring(location.indexOf("code=")+5,location.indexOf("&state="));
   String form="grant_type=authorization_code&client_id=client&resource="+java.net.URLEncoder.encode(RESOURCE,StandardCharsets.UTF_8)+"&redirect_uri="+java.net.URLEncoder.encode(REDIRECT,StandardCharsets.UTF_8)+"&code="+code+"&code_verifier="+VERIFIER;
@@ -106,7 +106,7 @@ final class SokletOAuthAuthorizationServerTests {
  @Test void metadataJwksAndHeadEmitExactBodies() throws Exception {
   var s=server(false);for(var prepared:List.of(s.metadataResponse("GET"),s.metadataResponse("HEAD"),s.jsonWebKeySetResponse("GET"),s.jsonWebKeySetResponse("HEAD"))) {
    var response=SokletOAuthAuthorizationServer.responseFor(prepared);assertEquals(prepared.getStatusCode(),response.getStatusCode());assertArrayEquals(prepared.toHttpBodyWithCredentials(),body(response));
-   prepared.getHeaders().forEach((k,v)->assertEquals(Set.copyOf(v),response.getHeaders().get(k)));
+   prepared.getHeaders().forEach((k,v)->assertEquals(List.copyOf(v),response.getHeaders().get(k)));
   }
  }
  @Test void infrastructureFailurePropagatesAsTypedFailure() throws Exception {

@@ -51,9 +51,8 @@ public final class SokletOAuth {
 	 * the unchanged body, raw query and every materialized Content-Type value to core's form parser. No decoded
 	 * query or form map is used. This parsing grants no identity and does not validate pending transaction state.
 	 * <p>
-	 * Soklet represents header values as sets. Identical physical duplicate fields, including differently cased
-	 * names, can lose multiplicity before this helper sees them; a trusted edge must reject those duplicates.
-	 * Distinct materialized values are preserved and rejected by core when ambiguous.
+	 * Soklet 4 preserves header values as lists. Every materialized occurrence, including identical physical
+	 * duplicates and differently cased names, is passed to core for ambiguity checks.
 	 *
 	 * @param request the application-routed callback request
 	 * @return the untrusted parsed callback
@@ -100,17 +99,17 @@ public final class SokletOAuth {
 	public static @NonNull Response redirect(@NonNull URI location,
 			@NonNull Set<@NonNull ResponseCookie> cookies) {
 		String value = redirectLocation(requireNonNull(location));
-		return Response.withStatusCode(302).cookies(Set.copyOf(requireNonNull(cookies))).headers(Map.of(
-				"Location", Set.of(value),
-				"Cache-Control", Set.of("no-store"),
-				"Referrer-Policy", Set.of("no-referrer"))).build();
+		return Response.withStatusCode(302).cookies(List.copyOf(requireNonNull(cookies))).headers(Map.of(
+				"Location", List.of(value),
+				"Cache-Control", List.of("no-store"),
+				"Referrer-Policy", List.of("no-referrer"))).build();
 	}
 
 	static @NonNull List<@NonNull String> collectHeaderValues(@NonNull Request request, @NonNull String name) {
 		requireNonNull(request);
 		requireNonNull(name);
 		List<String> values = new ArrayList<>();
-		for (Map.Entry<String, Set<String>> entry : request.getHeaders().entrySet())
+		for (Map.Entry<String, List<String>> entry : request.getHeaders().entrySet())
 			if (name.equalsIgnoreCase(entry.getKey()))
 				values.addAll(entry.getValue());
 		return List.copyOf(values);

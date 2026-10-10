@@ -58,7 +58,7 @@ final class SokletOAuthTests {
 	@Test
 	void getIgnoresBodyAndContentType() {
 		Request request = Request.withRawUrl(HttpMethod.GET, "/callback?code=query&state=trusted-route")
-				.headers(Map.of("Content-Type", Set.of("text/plain")))
+				.headers(Map.of("Content-Type", List.of("text/plain")))
 				.body("code=body&state=body".getBytes(StandardCharsets.UTF_8)).build();
 		assertEquals("query", SokletOAuth.authorizationResponseFor(request).getCode().orElseThrow());
 	}
@@ -98,7 +98,7 @@ final class SokletOAuthTests {
 	@Test
 	void postAbsentBodyStillUsesTheRawMimeContract() {
 		Request request = Request.withRawUrl(HttpMethod.POST, "/callback")
-				.headers(Map.of("Content-Type", Set.of("application/x-www-form-urlencoded"))).build();
+				.headers(Map.of("Content-Type", List.of("application/x-www-form-urlencoded"))).build();
 		assertTrue(SokletOAuth.authorizationResponseFor(request).getParameters().isEmpty());
 	}
 
@@ -160,10 +160,10 @@ final class SokletOAuthTests {
 	void redirectCopiesApplicationCookiesAndPreservesTheirAttributes() {
 		ResponseCookie cookie = ResponseCookie.with("__Host-session", "synthetic")
 				.secure(true).httpOnly(true).path("/").sameSite(ResponseCookie.SameSite.LAX).build();
-		Set<ResponseCookie> cookies = new HashSet<>(Set.of(cookie));
+		Set<ResponseCookie> cookies = new HashSet<>(List.of(cookie));
 		Response response = SokletOAuth.redirect(URI.create("https://issuer.example.test/authorize"), cookies);
 		cookies.clear();
-		assertEquals(Set.of(cookie), response.getCookies());
+		assertEquals(List.of(cookie), response.getCookies());
 		assertTrue(response.getCookies().iterator().next().getSecure());
 		assertTrue(response.getCookies().iterator().next().getHttpOnly());
 		assertRedirect(response, "https://issuer.example.test/authorize");
@@ -178,7 +178,7 @@ final class SokletOAuthTests {
 	}
 
 	static @NonNull Request post(@NonNull String url, @NonNull String body, @NonNull String contentType) {
-		return Request.withRawUrl(HttpMethod.POST, url).headers(Map.of("Content-Type", Set.of(contentType)))
+		return Request.withRawUrl(HttpMethod.POST, url).headers(Map.of("Content-Type", List.of(contentType)))
 				.body(body.getBytes(StandardCharsets.UTF_8)).build();
 	}
 
@@ -190,9 +190,9 @@ final class SokletOAuthTests {
 
 	private static void assertRedirect(@NonNull Response response, @NonNull String expectedLocation) {
 		assertEquals(302, response.getStatusCode());
-		assertEquals(Set.of(expectedLocation), response.getHeaders().get("Location"));
-		assertEquals(Set.of("no-store"), response.getHeaders().get("Cache-Control"));
-		assertEquals(Set.of("no-referrer"), response.getHeaders().get("Referrer-Policy"));
+		assertEquals(List.of(expectedLocation), response.getHeaders().get("Location"));
+		assertEquals(List.of("no-store"), response.getHeaders().get("Cache-Control"));
+		assertEquals(List.of("no-referrer"), response.getHeaders().get("Referrer-Policy"));
 		assertTrue(response.getBody().isEmpty());
 	}
 }

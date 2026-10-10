@@ -41,9 +41,8 @@ import static java.util.Objects.requireNonNull;
  * route/issuer association, TLS, allocation/framing limits, sessions, authentication, consent and CSRF. These
  * helpers use no decoded query/form map and make no user or authorization decision.
  * <p>
- * Soklet's immutable header sets lose identical physical duplicates, including differently cased names.
- * A trusted edge must reject forbidden physical duplicates before materialization. All remaining occurrences
- * and exact strings reach core; its bounds and protocol rules remain authoritative.
+ * Soklet 4 exposes header values as lists. Every materialized occurrence and exact string reaches core;
+ * its bounds and protocol rules remain authoritative.
  * @since 1.0.0
  */
 @ThreadSafe
@@ -124,27 +123,27 @@ public final class SokletOAuthAuthorizationServer {
 	@CheckReturnValue
 	public static @NonNull MarshaledResponse responseFor(@NonNull OAuthServerResponse response) {
 		requireNonNull(response);
-		Map<String, Set<String>> headers = new LinkedHashMap<>();
-		response.getHeaders().forEach((name, values) -> headers.put(name, Set.copyOf(values)));
-		response.getLocationWithCredentials().ifPresent(uri -> headers.put("Location", Set.of(uri.toASCIIString())));
+		Map<String, List<String>> headers = new LinkedHashMap<>();
+		response.getHeaders().forEach((name, values) -> headers.put(name, List.copyOf(values)));
+		response.getLocationWithCredentials().ifPresent(uri -> headers.put("Location", List.of(uri.toASCIIString())));
 		return MarshaledResponse.withStatusCode(response.getStatusCode()).headers(headers)
 				.body(response.toHttpBodyWithCredentials()).build();
 	}
 
 	/** Lazy read-only views let core check occurrence/byte bounds before copying hostile header collections. */
 	private static @NonNull Map<@NonNull String, @NonNull List<@NonNull String>> headersFor(@NonNull Request request) {
-		Map<String, Set<String>> fields = request.getHeaders();
+		Map<String, List<String>> fields = request.getHeaders();
 		return new AbstractMap<>() {
 			@Override public @NonNull Set<Map.@NonNull Entry<@NonNull String, @NonNull List<@NonNull String>>> entrySet() {
 				return new AbstractSet<>() {
 					@Override public int size() { return fields.size(); }
 					@Override public @NonNull Iterator<Map.@NonNull Entry<@NonNull String, @NonNull List<@NonNull String>>> iterator() {
-						Iterator<Map.Entry<String, Set<String>>> entries = fields.entrySet().iterator();
+						Iterator<Map.Entry<String, List<String>>> entries = fields.entrySet().iterator();
 						return new Iterator<>() {
 							@Override public boolean hasNext() { return entries.hasNext(); }
 							@Override public Map.@NonNull Entry<@NonNull String, @NonNull List<@NonNull String>> next() {
-								Map.Entry<String, Set<String>> field = entries.next();
-								Set<String> values = field.getValue();
+								Map.Entry<String, List<String>> field = entries.next();
+								List<String> values = field.getValue();
 								List<String> view = new AbstractList<>() {
 									@Override public int size() { return values.size(); }
 									@Override public @NonNull String get(int index) {

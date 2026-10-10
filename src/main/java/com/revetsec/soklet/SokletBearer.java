@@ -42,9 +42,8 @@ public final class SokletBearer {
 	 * splitting their contents. Only absent headers return empty. Query, body and cookies are never credential
 	 * transports here. All grammar and credential-size decisions remain in Revetsec core.
 	 * <p>
-	 * Soklet's sets cannot reveal identical physical duplicate values, including fields with differently cased
-	 * names. A trusted edge must reject those duplicates; this helper cannot recover multiplicity already discarded.
-	 * Distinct materialized values remain ambiguous and are rejected by core.
+	 * Soklet 4 exposes header values as lists, so identical physical duplicates and differently cased field names
+	 * remain ambiguous and are rejected by core.
 	 *
 	 * @param request the resource request
 	 * @return an absent or unverified bearer credential

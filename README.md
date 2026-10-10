@@ -2,7 +2,7 @@
 
 Revetsec helpers for [Soklet](https://www.soklet.com) applications.
 
-**This adapter is pre-release.** OAuth callback/redirect, bearer parsing and issuer transport helpers are implemented; SAML and SCIM helpers remain planned. The version is `1.0.0-SNAPSHOT`, and there is no compatibility promise before 1.0.0.
+**This adapter is pre-release.** OAuth callback/redirect, bearer parsing, issuer transport and SAML binding helpers are implemented; SCIM helpers remain planned. The version is `1.0.0-SNAPSHOT`, and there is no compatibility promise before 1.0.0.
 
 ### What Is It?
 
@@ -16,7 +16,12 @@ Implemented static helpers:
 - `SokletBearer`: a request's bearer token, for resource servers such as MCP endpoints
 - `SokletOAuthAuthorizationServer`: raw authorization, token, revocation and introspection input and exact-byte core response mapping
 
-SAML HTTP-POST and SCIM helpers remain later milestone work.
+`SokletSaml` passes the original ACS POST body, Content-Type header multiplicity and raw
+Redirect query to core result parsers. Its outbound Redirect helpers take core-prepared
+authentication or logout results; the application supplies browser cookies and owns its
+sessions. `postFormResponse` renders a core-prepared AuthnRequest form. A runnable SAML
+Playground is available in the core repository's unpublished `examples/playground/`.
+SCIM helpers remain later milestone work.
 
 ### Usage
 

@@ -56,7 +56,7 @@ final class SokletRawInputTests {
 	void helperMatchesCoreForUnchangedPostBytesQueryAndMime() {
 		byte[] body = "code=x%252Fy&state=a%2Bb&extra=x&extra=x".getBytes(StandardCharsets.UTF_8);
 		Request request = Request.withRawUrl(HttpMethod.POST, "/callback?source=raw%2Bquery")
-				.headers(Map.of("cOnTeNt-TyPe", Set.of("application/x-www-form-urlencoded; charset=UTF-8")))
+				.headers(Map.of("cOnTeNt-TyPe", List.of("application/x-www-form-urlencoded; charset=UTF-8")))
 				.body(body).build();
 		assertArrayEquals(body, request.getBody().orElseThrow());
 		assertEquals(AuthorizationResponse.fromFormBody(body,
@@ -73,7 +73,7 @@ final class SokletRawInputTests {
 	@Test
 	void distinctContentTypeValuesCannotBeSelectedOrJoined() {
 		assertMalformed(Request.withRawUrl(HttpMethod.POST, "/callback")
-				.headers(Map.of("Content-Type", Set.of("application/x-www-form-urlencoded", "text/plain")))
+				.headers(Map.of("Content-Type", List.of("application/x-www-form-urlencoded", "text/plain")))
 				.body("code=a&state=b".getBytes(StandardCharsets.UTF_8)).build());
 	}
 
@@ -101,7 +101,7 @@ final class SokletRawInputTests {
 	void invalidUtf8BodyRemainsMalformed() {
 		byte[] body = new byte[]{'c', 'o', 'd', 'e', '=', (byte) 0xc3, (byte) 0x28};
 		assertMalformed(Request.withRawUrl(HttpMethod.POST, "/callback")
-				.headers(Map.of("Content-Type", Set.of("application/x-www-form-urlencoded"))).body(body).build());
+				.headers(Map.of("Content-Type", List.of("application/x-www-form-urlencoded"))).body(body).build());
 	}
 
 	@Test
@@ -111,36 +111,40 @@ final class SokletRawInputTests {
 	}
 
 	@Test
-	void identicalPhysicalMultiplicityCannotBeRecoveredFromSokletHeaderSets() {
-		Set<String> materialized = new HashSet<>(List.of("Bearer synthetic", "Bearer synthetic"));
+	void identicalHeaderValuesRemainAmbiguous() {
 		Request request = Request.withRawUrl(HttpMethod.GET, "/resource")
-				.headers(Map.of("Authorization", materialized)).build();
-		assertEquals(List.of("Bearer synthetic"), SokletOAuth.collectHeaderValues(request, "Authorization"));
-		assertTrue(SokletBearer.bearerTokenFor(request).isPresent(),
-				"The trusted edge must reject identical physical duplicates before this Set representation");
+				.headers(Map.of("Authorization", List.of("Bearer synthetic", "Bearer synthetic"))).build();
+		assertEquals(List.of("Bearer synthetic", "Bearer synthetic"),
+				SokletOAuth.collectHeaderValues(request, "Authorization"));
+		assertMalformedBearer(request);
 	}
 
 	@Test
-	void identicalMixedCasePhysicalAuthorizationFieldsLoseSetMultiplicity() throws ReflectiveOperationException {
+	void identicalMixedCasePhysicalAuthorizationFieldsRemainAmbiguous() throws ReflectiveOperationException {
 		Request request = fromPhysicalHeaders(HttpMethod.GET, "/resource", List.of(
 				Map.entry("Authorization", "Bearer synthetic"), Map.entry("AUTHORIZATION", "Bearer synthetic")), null);
-		assertEquals(List.of("Bearer synthetic"), SokletOAuth.collectHeaderValues(request, "Authorization"));
-		assertTrue(SokletBearer.bearerTokenFor(request).isPresent(),
-				"The trusted edge must reject identical physical duplicates, including mixed-case names");
+		assertEquals(List.of("Bearer synthetic", "Bearer synthetic"),
+				SokletOAuth.collectHeaderValues(request, "Authorization"));
+		assertMalformedBearer(request);
 	}
 
 	@Test
 	void headerCollectionRetainsExactSpacesAndDoesNotMutateItsInput() {
 		Request request = Request.withRawUrl(HttpMethod.GET, "/resource")
-				.headers(Map.of("Authorization", Set.of("Bearer  synthetic"))).build();
+				.headers(Map.of("Authorization", List.of("Bearer  synthetic"))).build();
 		assertEquals(List.of("Bearer  synthetic"), SokletOAuth.collectHeaderValues(request, "authorization"));
-		assertEquals(Set.of("Bearer  synthetic"), request.getHeaders().get("Authorization"));
+		assertEquals(List.of("Bearer  synthetic"), request.getHeaders().get("Authorization"));
 	}
 
 	private static void assertMalformed(@NonNull Request request) {
 		OAuthResponseException failure = assertThrows(OAuthResponseException.class,
 				() -> SokletOAuth.authorizationResponseFor(request));
 		assertEquals(OAuthException.Reason.CALLBACK_MALFORMED, failure.getReason());
+	}
+
+	private static void assertMalformedBearer(@NonNull Request request) {
+		assertThrows(com.revetsec.oauth.AccessTokenValidationException.class,
+				() -> SokletBearer.bearerTokenFor(request));
 	}
 
 	/** Builds genuine Soklet Requests through the server's physical-header seam; reflection is test-only. */
