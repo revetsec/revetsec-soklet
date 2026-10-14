@@ -19,7 +19,7 @@ Implemented static helpers:
 `SokletSaml` passes the original ACS POST body, Content-Type header multiplicity and raw
 Redirect query to core result parsers. Its outbound Redirect helpers take core-prepared
 authentication or logout results; the application supplies browser cookies and owns its
-sessions. `postFormResponse` renders a core-prepared AuthnRequest form. A runnable SAML
+sessions. `postFormResponse` renders a core-prepared authentication or logout form. A runnable SAML
 Playground is available in the core repository's unpublished `examples/playground/`.
 SCIM helpers translate raw query/body data, conditional headers and core-prepared responses.
 
@@ -32,6 +32,14 @@ Response redirect = SokletOAuth.redirect(authorizationUri, responseCookies);
 ```
 
 The callback helper accepts GET or form POST and preserves a POST query alongside its raw body. Unsupported methods are app misuse. Configure trusted callback/provider URLs in the application. Pass the parsed callback and bound pending reference to the configured OAuth/OIDC client. A parsed bearer still requires access-token validation and an application permission check.
+
+### SAML HTTP-POST logout
+
+Use `SokletSaml.postLogoutBindingResultFor(request)` on logout POST routes. It preserves the original form body, every Content-Type value and the raw query and delegates binding checks to core. The existing `postBindingResultFor` ACS helper remains response-only. A parsed logout message's kind selects core's `acceptLogoutRequestResult` or `completeLogoutResult`; parsing never authenticates a message.
+
+Configure the SP's `postSingleLogoutServiceUrl` and the approved IdP's `postSingleLogoutService` explicitly. Emit `beginPostLogoutResult` prepared requests with `logoutPostFormResponse(prepared, cspNonce)` and `respondToPostLogoutRequestResult` prepared responses with `logoutResponsePostFormResponse(prepared, cspNonce)`. The generic `postFormResponse` also accepts both logout forms. These helpers retain core's exact UTF-8 form and no-store response headers. The application sets CSP and cookies before delivery, persists browser-bound pending state for SP logout, and owns IdP selection and local session cleanup. A pending cookie on a cross-site POST callback requires Secure, HttpOnly and SameSite=None; a server-side pending store still requires a browser-specific binding secret.
+
+Only core-accepted logout requests release checked session selectors, and only completed responses establish protocol success. Handle rejected, unavailable and indeterminate results. Clear pending browser state after a verified terminal status or expiry; a rejected callback does not cancel a valid pending attempt. Custom pending stores must implement conditional atomic `consumeIfMatches`; the default fails closed without consuming. RelayState stays opaque and is never a redirect destination.
 
 ### Installation
 
@@ -128,3 +136,22 @@ Use each helper on its configured route. Render interactions in the app and call
 `responseFor` preserves prepared bytes/status/headers and optional credential-bearing Location, bypassing JSON marshalling. Add app cookies separately and keep credential-bearing responses out of diagnostics. Header sets lose identical physical duplicates, including mixed-case names; reject forbidden physical duplicates and incomplete/oversized requests at the trusted edge. See core's unpublished self-issued MCP example for app-owned authentication and explicit volatile-storage qualification.
 
 SCIM schema/resource/query/response transport helpers are available through `SokletScim`. They preserve raw query/body data, physical header occurrences and prepared response bytes. The PATCH helper binds ordered operations through the core parser. See the core [SCIM server guide](../revetsec/docs/scim-server-primitives.md).
+
+Reject `request.isContentTooLarge()` before invoking any SCIM helper. Soklet discards an oversized body, so passing that incomplete request to a parser would appear to core as an empty body. Configure upstream body, complete-request and header limits before materialization. For example, after authenticating and resolving the tenant:
+
+```java
+if (request.isContentTooLarge()) {
+    return SokletScim.responseFor(provider.errorResponse(ScimError.requestTooLargeInstance()));
+}
+ScimResourceParseResult parsed = SokletScim.resourceResultFor(provider, users, request);
+```
+
+The application composes its authentication challenge and target-specific allowed methods with the prepared transport response. Keep the existing prepared headers and body when adding a bounded host header:
+
+```java
+MarshaledResponse denied = SokletScim.responseFor(provider.errorResponse(ScimError.unauthenticatedInstance()));
+return denied.copy().headers(headers ->
+    headers.put("WWW-Authenticate", List.of("Bearer realm=\"scim\""))).finish();
+```
+
+A 405 response needs an `Allow` header for the actual target route, using the same copier pattern. Add only methods that route implements. Host-added headers and actual HTTP framing remain subject to the application's transport limits.

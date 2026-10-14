@@ -42,6 +42,11 @@ import static java.util.Objects.requireNonNull;
  * Thin SCIM transport helpers for application-routed Soklet endpoints. Applications select the authenticated caller,
  * tenant, resource type and transaction, and enforce route methods. Each parser invokes one core operation using the
  * unchanged materialized raw query, body and physical header occurrences.
+ * Reject {@link Request#isContentTooLarge()} before invoking any helper, using an application response such as
+ * {@code provider.errorResponse(ScimError.requestTooLargeInstance())}. Soklet discards an oversized request body;
+ * passing that incomplete request to a body parser would otherwise appear to core as an empty body.
+ * Configure upstream body, complete-request and header limits before requests are materialized. The application
+ * also supplies authentication challenges and method-specific Allow headers when composing transport responses.
  *
  * @since 1.0.0
  */
@@ -64,6 +69,7 @@ public final class SokletScim {
     }
 
     /** Parses unchanged SearchRequest bytes and original Content-Type occurrences.
+     * The application must reject {@code request.isContentTooLarge()} before calling this helper.
      * @param provider the application's configured service provider
      * @param resourceType the application-selected registered resource type
      * @param request the materialized routed request
@@ -79,6 +85,7 @@ public final class SokletScim {
     }
 
     /** Parses unchanged create-resource bytes and original Content-Type occurrences.
+     * The application must reject {@code request.isContentTooLarge()} before calling this helper.
      * @param provider the application's configured service provider
      * @param resourceType the application-selected registered resource type
      * @param request the materialized routed request
@@ -94,6 +101,7 @@ public final class SokletScim {
     }
 
     /** Parses unchanged replacement bytes against the application-selected current resource.
+     * The application must reject {@code request.isContentTooLarge()} before calling this helper.
      * @param provider the application's configured service provider
      * @param resourceType the application-selected registered resource type
      * @param current the authoritative current resource used by the application transaction
@@ -110,6 +118,7 @@ public final class SokletScim {
     }
 
     /** Parses unchanged PatchOp bytes and original Content-Type occurrences.
+     * The application must reject {@code request.isContentTooLarge()} before calling this helper.
      * @param provider the application's configured service provider
      * @param resourceType the application-selected registered resource type
      * @param request the materialized routed request

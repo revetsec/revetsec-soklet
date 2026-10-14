@@ -16,11 +16,19 @@
 package com.revetsec.soklet;
 
 import com.revetsec.saml.SamlPostBindingParseResult;
+import com.revetsec.saml.SamlPostBindingMessage;
+import com.revetsec.saml.SamlLogoutPostResult;
+import com.revetsec.saml.SamlLogoutResponsePostResult;
+import com.revetsec.saml.SamlLogoutRequestResult;
+import com.revetsec.saml.SamlLogoutResult;
+import com.revetsec.saml.SamlLogoutStatus;
 import com.revetsec.saml.SamlRedirectBindingParseResult;
 import com.revetsec.saml.SamlAuthenticationRequestResult;
 import com.revetsec.saml.SamlIdentityProvider;
 import com.revetsec.saml.SamlServiceProvider;
 import com.revetsec.saml.InMemorySamlReplayCache;
+import com.soklet.MarshaledResponse;
+import com.soklet.MarshaledResponseBody;
 import com.soklet.HttpMethod;
 import com.soklet.Request;
 import com.soklet.Response;
@@ -37,6 +45,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -69,6 +80,79 @@ final class SokletSamlTests {
                 SokletSaml.redirectBindingResultFor(request));
         assertThrows(IllegalArgumentException.class,
                 () -> SokletSaml.postBindingResultFor(request));
+    }
+
+    @Test
+    void logoutPostPreservesKindRelayAndStrictRawTransportChecks() {
+        String payload = "PGEvPg%3D%3D";
+        for (String field : List.of("SAMLRequest", "SAMLResponse")) {
+            byte[] body = (field + "=" + payload + "&RelayState=alpha%2Bbeta").getBytes(StandardCharsets.US_ASCII);
+            Request request = Request.withRawUrl(HttpMethod.POST, "/logout?tenant=one")
+                    .headers(Map.of("Content-Type", List.of("application/x-www-form-urlencoded"))).body(body).build();
+            SamlPostBindingMessage message = assertInstanceOf(SamlPostBindingParseResult.Parsed.class,
+                    SokletSaml.postLogoutBindingResultFor(request)).getMessage();
+            assertEquals("SAMLRequest".equals(field) ? SamlPostBindingMessage.Kind.REQUEST
+                    : SamlPostBindingMessage.Kind.RESPONSE, message.getKind());
+            assertEquals("alpha+beta", message.getRelayState().orElseThrow());
+            Request polluted = Request.withRawUrl(HttpMethod.POST, "/logout?RelayState=evil")
+                    .headers(request.getHeaders()).body(body).build();
+            assertEquals(SamlPostBindingParseResult.Reason.QUERY, assertInstanceOf(
+                    SamlPostBindingParseResult.Rejected.class, SokletSaml.postLogoutBindingResultFor(polluted)).getReason());
+            Request duplicated = Request.withRawUrl(HttpMethod.POST, "/logout")
+                    .headers(Map.of("Content-Type", List.of("application/x-www-form-urlencoded",
+                            "application/x-www-form-urlencoded"))).body(body).build();
+            assertEquals(SamlPostBindingParseResult.Reason.CONTENT_TYPE, assertInstanceOf(
+                    SamlPostBindingParseResult.Rejected.class, SokletSaml.postLogoutBindingResultFor(duplicated)).getReason());
+        }
+        Request requestAtAcs = Request.withRawUrl(HttpMethod.POST, "/acs")
+                .headers(Map.of("Content-Type", List.of("application/x-www-form-urlencoded")))
+                .body(("SAMLRequest=" + payload).getBytes(StandardCharsets.US_ASCII)).build();
+        assertInstanceOf(SamlPostBindingParseResult.Rejected.class, SokletSaml.postBindingResultFor(requestAtAcs));
+        assertThrows(IllegalArgumentException.class,
+                () -> SokletSaml.postLogoutBindingResultFor(Request.fromRawUrl(HttpMethod.GET, "/logout")));
+    }
+
+    @Test
+    void logoutFormsAndCallbacksUseCoreValidationAndReplayFence() throws Exception {
+        SamlPostLogoutFixture fixture = new SamlPostLogoutFixture();
+        SamlLogoutPostResult.Prepared begin = assertInstanceOf(SamlLogoutPostResult.Prepared.class,
+                fixture.sp.beginPostLogoutResult(fixture.idp, fixture.session));
+        String nonce = "abcdefghijklmnopqrstuvwxyz012345";
+        MarshaledResponse outbound = SokletSaml.logoutPostFormResponse(begin, nonce);
+        assertEquals(200, outbound.getStatusCode());
+        assertEquals(List.of("no-store"), outbound.getHeaders().get("Cache-Control"));
+        assertEquals(List.of("no-referrer"), outbound.getHeaders().get("Referrer-Policy"));
+        assertArrayEquals(begin.getPostForm().toHtml(nonce).getBytes(StandardCharsets.UTF_8),
+                assertInstanceOf(MarshaledResponseBody.Bytes.class, outbound.getBody().orElseThrow()).getBytes());
+        assertTrue(begin.getPostForm().getFields().containsKey("SAMLRequest"));
+        assertFalse(begin.getPostForm().getFields().containsKey("SAMLResponse"));
+        Request response = logoutPostRequest(fixture.responseBody(begin.getPendingLogout()));
+        SamlPostBindingMessage message = assertInstanceOf(SamlPostBindingParseResult.Parsed.class,
+                SokletSaml.postLogoutBindingResultFor(response)).getMessage();
+        var pending = fixture.pendingSource(begin.getPendingLogout());
+        assertInstanceOf(SamlLogoutResult.Succeeded.class,
+                fixture.sp.completeLogoutResult(message, pending, fixture.idp));
+        assertInstanceOf(SamlLogoutResult.Rejected.class,
+                fixture.sp.completeLogoutResult(message, pending, fixture.idp));
+
+        SamlPostBindingMessage request = assertInstanceOf(SamlPostBindingParseResult.Parsed.class,
+                SokletSaml.postLogoutBindingResultFor(logoutPostRequest(fixture.requestBody("_idp-logout")))).getMessage();
+        var accepted = assertInstanceOf(SamlLogoutRequestResult.Accepted.class,
+                fixture.sp.acceptLogoutRequestResult(request, fixture.idp));
+        assertInstanceOf(SamlLogoutRequestResult.Rejected.class,
+                fixture.sp.acceptLogoutRequestResult(request, fixture.idp));
+        SamlLogoutResponsePostResult.Prepared reply = assertInstanceOf(SamlLogoutResponsePostResult.Prepared.class,
+                fixture.sp.respondToPostLogoutRequestResult(accepted.getRequest(), fixture.idp, SamlLogoutStatus.SUCCESS));
+        MarshaledResponse answer = SokletSaml.logoutResponsePostFormResponse(reply, null);
+        assertEquals(200, answer.getStatusCode());
+        assertArrayEquals(reply.getPostForm().toHtml(null).getBytes(StandardCharsets.UTF_8), assertInstanceOf(MarshaledResponseBody.Bytes.class, answer.getBody().orElseThrow()).getBytes());
+        assertTrue(reply.getPostForm().getFields().containsKey("SAMLResponse"));
+        assertFalse(reply.getPostForm().getFields().containsKey("SAMLRequest"));
+    }
+
+    private static @NonNull Request logoutPostRequest(byte @NonNull [] body) {
+        return Request.withRawUrl(HttpMethod.POST, "/logout")
+                .headers(Map.of("Content-Type", List.of("application/x-www-form-urlencoded"))).body(body).build();
     }
 
     @Test

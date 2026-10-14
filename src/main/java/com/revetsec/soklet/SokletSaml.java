@@ -22,6 +22,8 @@ import com.revetsec.saml.SamlPostForm;
 import com.revetsec.saml.SamlAuthenticationRequestResult;
 import com.revetsec.saml.SamlLogoutRedirectResult;
 import com.revetsec.saml.SamlLogoutResponseRedirectResult;
+import com.revetsec.saml.SamlLogoutPostResult;
+import com.revetsec.saml.SamlLogoutResponsePostResult;
 import com.revetsec.saml.SamlRedirectBindingMessage;
 import com.revetsec.saml.SamlRedirectBindingParseResult;
 import com.soklet.HttpMethod;
@@ -65,6 +67,26 @@ public final class SokletSaml {
         if (request.getHttpMethod() != HttpMethod.POST)
             throw new IllegalArgumentException("SAML ACS route requires POST");
         return SamlPostBindingMessage.fromFormBodyResult(
+                request.getBody().orElseGet(() -> new byte[0]),
+                SokletOAuth.collectHeaderValues(request, "Content-Type"),
+                request.getRawQuery().orElse(null));
+    }
+
+    /**
+     * Parses an original logout POST body and every Content-Type value, preserving duplicates.
+     * The application supplies its browser-bound pending state to core when completing SP logout;
+     * a pending cookie for a cross-site POST requires Secure, HttpOnly and SameSite=None.
+     *
+     * @param request application-routed logout POST request
+     * @return core's untrusted logout POST-binding parse result
+     * @since 1.0.0
+     */
+    @CheckReturnValue
+    public static @NonNull SamlPostBindingParseResult postLogoutBindingResultFor(@NonNull Request request) {
+        requireNonNull(request);
+        if (request.getHttpMethod() != HttpMethod.POST)
+            throw new IllegalArgumentException("SAML logout route requires POST");
+        return SamlPostBindingMessage.fromLogoutFormBodyResult(
                 request.getBody().orElseGet(() -> new byte[0]),
                 SokletOAuth.collectHeaderValues(request, "Content-Type"),
                 request.getRawQuery().orElse(null));
@@ -129,6 +151,35 @@ public final class SokletSaml {
         return preparedRedirect(requireNonNull(prepared).getRedirectUri(), cookies);
     }
 
+    /**
+     * Sends a core-prepared SP logout POST form. Set the browser-bound pending cookie and CSP
+     * before delivery; a cross-site POST pending cookie requires Secure, HttpOnly and SameSite=None.
+     *
+     * @param prepared core-prepared logout request
+     * @param cspNonce application-generated nonce, or null for manual submission
+     * @return exact UTF-8 HTML response
+     * @since 1.0.0
+     */
+    @CheckReturnValue
+    public static @NonNull MarshaledResponse logoutPostFormResponse(
+            SamlLogoutPostResult.@NonNull Prepared prepared, @Nullable String cspNonce) {
+        return postFormResponse(requireNonNull(prepared).getPostForm(), cspNonce);
+    }
+
+    /**
+     * Sends a core-prepared POST answer to an IdP logout request. The application sets its CSP.
+     *
+     * @param prepared core-prepared logout response
+     * @param cspNonce application-generated nonce, or null for manual submission
+     * @return exact UTF-8 HTML response
+     * @since 1.0.0
+     */
+    @CheckReturnValue
+    public static @NonNull MarshaledResponse logoutResponsePostFormResponse(
+            SamlLogoutResponsePostResult.@NonNull Prepared prepared, @Nullable String cspNonce) {
+        return postFormResponse(requireNonNull(prepared).getPostForm(), cspNonce);
+    }
+
     private static @NonNull Response preparedRedirect(@NonNull URI destination,
             @NonNull Set<@NonNull ResponseCookie> cookies) {
         if (!"https".equalsIgnoreCase(requireNonNull(destination).getScheme()))
@@ -140,7 +191,7 @@ public final class SokletSaml {
      * Sends a core-prepared POST form with no-store headers. The application sets a CSP header
      * appropriate to its page and chooses the pending cookie before calling this helper.
      *
-     * @param form core-prepared POST AuthnRequest form
+     * @param form core-prepared SAML authentication or logout form
      * @param cspNonce application-generated nonce, or null for manual submission
      * @return exact UTF-8 HTML response
      * @since 1.0.0
