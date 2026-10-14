@@ -2,7 +2,7 @@
 
 Revetsec helpers for [Soklet](https://www.soklet.com) applications.
 
-**This adapter is pre-release.** OAuth callback/redirect, bearer parsing, issuer transport and SAML binding helpers are implemented; SCIM helpers remain planned. The version is `1.0.0-SNAPSHOT`, and there is no compatibility promise before 1.0.0.
+**This adapter is pre-release.** OAuth callback/redirect, bearer parsing, issuer transport and SAML binding helpers are implemented; SCIM schema/resource/query/response and PATCH helpers are implemented. The version is `1.0.0-SNAPSHOT`, and there is no compatibility promise before 1.0.0.
 
 ### What Is It?
 
@@ -21,7 +21,7 @@ Redirect query to core result parsers. Its outbound Redirect helpers take core-p
 authentication or logout results; the application supplies browser cookies and owns its
 sessions. `postFormResponse` renders a core-prepared AuthnRequest form. A runnable SAML
 Playground is available in the core repository's unpublished `examples/playground/`.
-SCIM helpers remain later milestone work.
+SCIM helpers translate raw query/body data, conditional headers and core-prepared responses.
 
 ### Usage
 
@@ -126,3 +126,5 @@ MarshaledResponse response = SokletOAuthAuthorizationServer.responseFor(prepared
 Use each helper on its configured route. Render interactions in the app and call core directly to resume/complete consent. Metadata/JWKS use `responseFor(server.metadataResponse(method))` and `responseFor(server.jsonWebKeySetResponse(method))`. Expected failures remain core results; typed infrastructure failures propagate for mapping with `server.responseForFailure(failure)`.
 
 `responseFor` preserves prepared bytes/status/headers and optional credential-bearing Location, bypassing JSON marshalling. Add app cookies separately and keep credential-bearing responses out of diagnostics. Header sets lose identical physical duplicates, including mixed-case names; reject forbidden physical duplicates and incomplete/oversized requests at the trusted edge. See core's unpublished self-issued MCP example for app-owned authentication and explicit volatile-storage qualification.
+
+SCIM schema/resource/query/response transport helpers are available through `SokletScim`. They preserve raw query/body data, physical header occurrences and prepared response bytes. The PATCH helper binds ordered operations through the core parser. See the core [SCIM server guide](../revetsec/docs/scim-server-primitives.md).
