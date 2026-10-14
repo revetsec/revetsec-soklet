@@ -174,8 +174,11 @@ public final class SokletScim {
     @CheckReturnValue
     public static @NonNull MarshaledResponse responseFor(@NonNull ScimResponse response) {
         requireNonNull(response);
-        return MarshaledResponse.withStatusCode(response.getStatusCode()).headers(response.getHeaders())
-                .body(response.toHttpBodyWithPersonalData()).build();
+        MarshaledResponse.Builder builder = MarshaledResponse.withStatusCode(response.getStatusCode()).headers(response.getHeaders());
+        byte[] bytes = response.toHttpBodyWithPersonalData();
+        // Soklet requires no entity for 204/304; supplying even a zero-length entity is rejected at dispatch.
+        if (bytes.length > 0) builder.body(bytes);
+        return builder.build();
     }
 
     /** A bounded core parser can inspect occurrence counts before any hostile collection is copied or joined. */

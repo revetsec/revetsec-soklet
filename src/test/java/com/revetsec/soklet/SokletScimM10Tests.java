@@ -128,7 +128,8 @@ final class SokletScimM10Tests {
         for (ScimResponse response : List.of(error, modified, provider.noContentResponse())) {
             MarshaledResponse emitted = SokletScim.responseFor(response);
             assertEquals(response.getStatusCode(), emitted.getStatusCode());
-            assertArrayEquals(response.toHttpBodyWithPersonalData(), assertInstanceOf(MarshaledResponseBody.Bytes.class, emitted.getBody().orElseThrow()).getBytes());
+            if (response.toHttpBodyWithPersonalData().length == 0) assertTrue(emitted.getBody().isEmpty());
+            else assertArrayEquals(response.toHttpBodyWithPersonalData(), assertInstanceOf(MarshaledResponseBody.Bytes.class, emitted.getBody().orElseThrow()).getBytes());
             response.getHeaders().forEach((name, values) -> assertEquals(values, emitted.getHeaders().get(name)));
         }
     }
