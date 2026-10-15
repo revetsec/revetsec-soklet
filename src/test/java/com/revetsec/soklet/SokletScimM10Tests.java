@@ -72,35 +72,46 @@ final class SokletScimM10Tests {
         ScimServiceProvider provider = provider();
         byte[] bytes = ("{\"schemas\":[\"" + USER_SCHEMA + "\"],\"userName\":\"a+b%20c\"}").getBytes(StandardCharsets.UTF_8);
         Request request = Request.withRawUrl(HttpMethod.POST, "/scim/Users").headers(Map.of("cOnTeNt-TyPe", List.of("application/scim+json"))).body(bytes).build();
-        ScimResource parsed = assertInstanceOf(ScimResourceParseResult.Succeeded.class, SokletScim.resourceResultFor(provider, USER, request)).getResource();
+        ScimResource parsed = assertInstanceOf(ScimResourceParseResult.Succeeded.class, SokletTransportFixtures.completed(SokletScim.resourceResultFor(provider, USER, request))).getResource();
         assertEquals("a+b%20c", ScimUser.fromResource(parsed).getUserName());
         assertArrayEquals(bytes, request.getBody().orElseThrow());
         Request repeated = SokletRawInputTests.fromPhysicalHeaders(HttpMethod.POST, "/scim/Users",
                 List.of(Map.entry("Content-Type", "application/json"), Map.entry("CONTENT-TYPE", "application/json")), bytes);
         assertSame(ScimError.unsupportedMediaTypeInstance(), assertInstanceOf(ScimResourceParseResult.Rejected.class,
-                SokletScim.resourceResultFor(provider, USER, repeated)).getError());
+                SokletTransportFixtures.completed(SokletScim.resourceResultFor(provider, USER, repeated))).getError());
         Request missing = Request.withRawUrl(HttpMethod.POST, "/scim/Users").headers(Map.of("Content-Type", List.of("application/json"))).build();
-        assertInstanceOf(ScimResourceParseResult.Rejected.class, SokletScim.resourceResultFor(provider, USER, missing));
+        assertInstanceOf(ScimResourceParseResult.Rejected.class, SokletTransportFixtures.completed(SokletScim.resourceResultFor(provider, USER, missing)));
     }
 
     @Test void malformedUtf8AndDuplicateJsonMembersReachStrictCoreParsing() {
         ScimServiceProvider provider = provider();
         Request invalidUtf8 = Request.withRawUrl(HttpMethod.POST, "/scim/Users").headers(Map.of("Content-Type", List.of("application/json")))
                 .body(new byte[]{'{', '"', 'x', '"', ':', '"', (byte) 0xc3, (byte) 0x28, '"', '}'}).build();
-        assertInstanceOf(ScimResourceParseResult.Rejected.class, SokletScim.resourceResultFor(provider, USER, invalidUtf8));
+        assertInstanceOf(ScimResourceParseResult.Rejected.class, SokletTransportFixtures.completed(SokletScim.resourceResultFor(provider, USER, invalidUtf8)));
         Request duplicate = json(HttpMethod.POST, "/scim/Users", "{\"schemas\":[\"" + USER_SCHEMA + "\"],\"userName\":\"a\",\"USERNAME\":\"b\"}");
-        assertInstanceOf(ScimResourceParseResult.Rejected.class, SokletScim.resourceResultFor(provider, USER, duplicate));
+        assertInstanceOf(ScimResourceParseResult.Rejected.class, SokletTransportFixtures.completed(SokletScim.resourceResultFor(provider, USER, duplicate)));
+    }
+
+    @Test void discardedOversizedBodyFailsClosedForAllScimBodyParsers() {
+        ScimServiceProvider provider = provider();
+        Request request = Request.withRawUrl(HttpMethod.POST, "/scim/Users")
+                .headers(Map.of("Content-Type", List.of("application/scim+json")))
+                .contentTooLarge(true).build();
+        assertInstanceOf(SokletRequestResult.TooLarge.class, SokletScim.searchRequestResultFor(provider, USER, request));
+        assertInstanceOf(SokletRequestResult.TooLarge.class, SokletScim.resourceResultFor(provider, USER, request));
+        assertInstanceOf(SokletRequestResult.TooLarge.class, SokletScim.replacementResultFor(provider, USER, resource(), request));
+        assertInstanceOf(SokletRequestResult.TooLarge.class, SokletScim.patchRequestResultFor(provider, USER, request));
     }
 
     @Test void searchAndReplacementUseTheirOriginalBodiesAndTheAuthoritativeCurrentResource() {
         ScimServiceProvider provider = provider();
         Request search = json(HttpMethod.POST, "/scim/Users/.search", "{\"schemas\":[\"urn:ietf:params:scim:api:messages:2.0:SearchRequest\"],\"count\":2}");
         assertEquals(2, assertInstanceOf(ScimQueryParseResult.Succeeded.class,
-                SokletScim.searchRequestResultFor(provider, USER, search)).getQuery().getCount());
+                SokletTransportFixtures.completed(SokletScim.searchRequestResultFor(provider, USER, search))).getQuery().getCount());
         ScimResource current = resource();
         Request replacement = json(HttpMethod.PUT, "/scim/Users/u", "{\"schemas\":[\"" + USER_SCHEMA + "\"],\"userName\":\"new-name\"}");
         ScimResource updated = assertInstanceOf(ScimResourceParseResult.Succeeded.class,
-                SokletScim.replacementResultFor(provider, USER, current, replacement)).getResource();
+                SokletTransportFixtures.completed(SokletScim.replacementResultFor(provider, USER, current, replacement))).getResource();
         assertEquals("new-name", ScimUser.fromResource(updated).getUserName());
         assertEquals("u", updated.getId().orElseThrow());
         assertEquals("old-name", ScimUser.fromResource(current).getUserName());
@@ -139,7 +150,7 @@ final class SokletScimM10Tests {
         ScimServiceProvider provider = ScimServiceProvider.builder().baseUri(URI.create("https://example.com/scim/"))
                 .resourceTypes(List.of(USER)).observer(observer).build();
         Request request = json(HttpMethod.POST, "/scim/Users", "{\"schemas\":[\"" + USER_SCHEMA + "\"],\"userName\":\"fixture\"}");
-        assertInstanceOf(ScimResourceParseResult.Succeeded.class, SokletScim.resourceResultFor(provider, USER, request));
+        assertInstanceOf(ScimResourceParseResult.Succeeded.class, SokletTransportFixtures.completed(SokletScim.resourceResultFor(provider, USER, request)));
         assertEquals(1, observer.begins.get()); assertEquals(1, observer.ends.get());
         assertEquals(Operation.RESOURCE_CREATE, observer.operation.get());
         assertEquals(Outcome.SUCCEEDED, observer.outcome.get());
@@ -150,7 +161,7 @@ final class SokletScimM10Tests {
         assertThrows(NullPointerException.class, () -> SokletScim.queryResultFor(null, USER, request));
         assertThrows(NullPointerException.class, () -> SokletScim.queryResultFor(provider, null, request));
         assertThrows(NullPointerException.class, () -> SokletScim.queryResultFor(provider, USER, null));
-        assertThrows(NullPointerException.class, () -> SokletScim.replacementResultFor(provider, USER, null, request));
+        assertThrows(NullPointerException.class, () -> SokletTransportFixtures.completed(SokletScim.replacementResultFor(provider, USER, null, request)));
         assertThrows(NullPointerException.class, () -> SokletScim.responseFor(null));
     }
 

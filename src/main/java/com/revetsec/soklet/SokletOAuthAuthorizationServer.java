@@ -33,6 +33,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import static java.util.Objects.requireNonNull;
 
@@ -55,61 +56,65 @@ public final class SokletOAuthAuthorizationServer {
 	 * @param server configured issuer
 	 * @param request request on the configured authorization route
 	 * @param browserBinding canonical random binding retained in the protected application session
-	 * @return core's restricted interaction or rejection
+	 * @return an oversized transport outcome or core's restricted interaction or rejection
 	 * @throws NullPointerException if a required argument is null
 	 * @since 1.0.0
 	 */
 	@CheckReturnValue
-	public static @NonNull OAuthAuthorizationResult beginAuthorizationResultFor(@NonNull OAuthAuthorizationServer server,
+	public static @NonNull SokletRequestResult<@NonNull OAuthAuthorizationResult> beginAuthorizationResultFor(@NonNull OAuthAuthorizationServer server,
 			@NonNull Request request, @NonNull String browserBinding) {
 		requireNonNull(server); requireNonNull(request); requireNonNull(browserBinding);
-		return server.beginAuthorizationResult(request.getHttpMethod().name(), request.getRawQuery().orElse(null),
-				request.getBody().orElseGet(() -> new byte[0]), headersFor(request), browserBinding);
+		if (Boolean.TRUE.equals(request.isContentTooLarge())) return SokletRequestResult.fromTooLarge();
+		return SokletRequestResult.fromResult(server.beginAuthorizationResult(request.getHttpMethod().name(), request.getRawQuery().orElse(null),
+				SokletOAuth.bodyBytesFor(request), headersFor(request), browserBinding));
 	}
 
 	/**
 	 * Handles unchanged token form bytes and every materialized header occurrence.
 	 * @param server configured issuer
 	 * @param request request on the configured token route
-	 * @return core's committed response or rejection
+	 * @return an oversized transport outcome or core's committed response or rejection
 	 * @throws NullPointerException if a required argument is null
 	 * @since 1.0.0
 	 */
 	@CheckReturnValue
-	public static @NonNull OAuthTokenResult tokenResultFor(@NonNull OAuthAuthorizationServer server, @NonNull Request request) {
+	public static @NonNull SokletRequestResult<@NonNull OAuthTokenResult> tokenResultFor(@NonNull OAuthAuthorizationServer server, @NonNull Request request) {
 		requireNonNull(server); requireNonNull(request);
-		return server.tokenResult(request.getHttpMethod().name(), request.getRawQuery().orElse(null),
-				request.getBody().orElseGet(() -> new byte[0]), headersFor(request));
+		if (Boolean.TRUE.equals(request.isContentTooLarge())) return SokletRequestResult.fromTooLarge();
+		return SokletRequestResult.fromResult(server.tokenResult(request.getHttpMethod().name(), request.getRawQuery().orElse(null),
+				SokletOAuth.bodyBytesFor(request), headersFor(request)));
 	}
 
 	/**
 	 * Handles raw revocation input; optional endpoint configuration remains a core precondition.
 	 * @param server configured issuer
 	 * @param request request on the configured revocation route
-	 * @return core's committed response or rejection
+	 * @return an oversized transport outcome or core's committed response or rejection
 	 * @throws NullPointerException if a required argument is null
 	 * @since 1.0.0
 	 */
 	@CheckReturnValue
-	public static @NonNull OAuthRevocationResult revocationResultFor(@NonNull OAuthAuthorizationServer server, @NonNull Request request) {
+	public static @NonNull SokletRequestResult<@NonNull OAuthRevocationResult> revocationResultFor(@NonNull OAuthAuthorizationServer server, @NonNull Request request) {
 		requireNonNull(server); requireNonNull(request);
-		return server.revokeResult(request.getHttpMethod().name(), request.getRawQuery().orElse(null),
-				request.getBody().orElseGet(() -> new byte[0]), headersFor(request));
+		if (Boolean.TRUE.equals(request.isContentTooLarge())) return SokletRequestResult.fromTooLarge();
+		return SokletRequestResult.fromResult(server.revokeResult(request.getHttpMethod().name(), request.getRawQuery().orElse(null),
+				SokletOAuth.bodyBytesFor(request), headersFor(request)));
 	}
 
 	/**
 	 * Handles raw introspection input without selecting caller/resource authorization in the adapter.
 	 * @param server configured issuer
 	 * @param request request on the configured introspection route
-	 * @return core's committed response or rejection
+	 * @return an oversized transport outcome or core's committed response or rejection
 	 * @throws NullPointerException if a required argument is null
 	 * @since 1.0.0
 	 */
 	@CheckReturnValue
-	public static @NonNull OAuthIntrospectionResult introspectionResultFor(@NonNull OAuthAuthorizationServer server, @NonNull Request request) {
+	public static @NonNull SokletRequestResult<@NonNull OAuthIntrospectionResult> introspectionResultFor(@NonNull OAuthAuthorizationServer server, @NonNull Request request) {
 		requireNonNull(server); requireNonNull(request);
-		return server.introspectionResult(request.getHttpMethod().name(), request.getRawQuery().orElse(null),
-				request.getBody().orElseGet(() -> new byte[0]), headersFor(request));
+		if (Boolean.TRUE.equals(request.isContentTooLarge())) return SokletRequestResult.fromTooLarge();
+		return SokletRequestResult.fromResult(server.introspectionResult(request.getHttpMethod().name(), request.getRawQuery().orElse(null),
+				SokletOAuth.bodyBytesFor(request), headersFor(request)));
 	}
 
 	/**
@@ -123,9 +128,10 @@ public final class SokletOAuthAuthorizationServer {
 	@CheckReturnValue
 	public static @NonNull MarshaledResponse responseFor(@NonNull OAuthServerResponse response) {
 		requireNonNull(response);
+		Optional<String> location = response.getLocationWithCredentials().map(SokletOAuth::redirectLocation);
 		Map<String, List<String>> headers = new LinkedHashMap<>();
 		response.getHeaders().forEach((name, values) -> headers.put(name, List.copyOf(values)));
-		response.getLocationWithCredentials().ifPresent(uri -> headers.put("Location", List.of(uri.toASCIIString())));
+		location.ifPresent(value -> headers.put("Location", List.of(value)));
 		return MarshaledResponse.withStatusCode(response.getStatusCode()).headers(headers)
 				.body(response.toHttpBodyWithCredentials()).build();
 	}

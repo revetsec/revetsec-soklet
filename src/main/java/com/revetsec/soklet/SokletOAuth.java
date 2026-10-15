@@ -25,7 +25,7 @@ import org.jspecify.annotations.NonNull;
 
 import javax.annotation.concurrent.ThreadSafe;
 import java.net.URI;
-import java.util.ArrayList;
+import java.util.AbstractList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -55,19 +55,20 @@ public final class SokletOAuth {
 	 * duplicates and differently cased names, is passed to core for ambiguity checks.
 	 *
 	 * @param request the application-routed callback request
-	 * @return the untrusted parsed callback
-	 * @throws IllegalArgumentException if the route uses neither GET nor POST
-	 * @throws com.revetsec.oauth.OAuthResponseException if core rejects the raw callback or Content-Type
+	 * @return parsed, rejected or oversized callback outcome
+	 * @throws IllegalArgumentException if the application route uses neither GET nor POST
 	 * @throws NullPointerException if request is null
 	 * @since 1.0.0
 	 */
-	public static @NonNull AuthorizationResponse authorizationResponseFor(@NonNull Request request) {
+	public static @NonNull SokletOAuthCallbackResult authorizationResponseResultFor(@NonNull Request request) {
 		requireNonNull(request);
+		if (Boolean.TRUE.equals(request.isContentTooLarge()))
+			return SokletOAuthCallbackResult.fromTooLarge();
 		if (request.getHttpMethod() == HttpMethod.GET)
-			return AuthorizationResponse.fromQueryString(request.getRawQuery().orElse(""));
+			return SokletOAuthCallbackResult.fromParseResult(AuthorizationResponse.fromQueryStringResult(request.getRawQuery().orElse("")));
 		if (request.getHttpMethod() == HttpMethod.POST)
-			return AuthorizationResponse.fromFormBody(request.getBody().orElseGet(() -> new byte[0]),
-					collectHeaderValues(request, "Content-Type"), request.getRawQuery().orElse(null));
+			return SokletOAuthCallbackResult.fromParseResult(AuthorizationResponse.fromFormBodyResult(bodyBytesFor(request),
+					collectHeaderValues(request, "Content-Type"), request.getRawQuery().orElse(null)));
 		throw new IllegalArgumentException("OAuth callback route must use GET or POST");
 	}
 
@@ -108,14 +109,37 @@ public final class SokletOAuth {
 	static @NonNull List<@NonNull String> collectHeaderValues(@NonNull Request request, @NonNull String name) {
 		requireNonNull(request);
 		requireNonNull(name);
-		List<String> values = new ArrayList<>();
-		for (Map.Entry<String, List<String>> entry : request.getHeaders().entrySet())
-			if (name.equalsIgnoreCase(entry.getKey()))
-				values.addAll(entry.getValue());
-		return List.copyOf(values);
+		Map<String, List<String>> fields = request.getHeaders();
+		return new AbstractList<>() {
+			@Override public int size() {
+				int count = 0;
+				for (Map.Entry<String, List<String>> entry : fields.entrySet())
+					if (name.equalsIgnoreCase(entry.getKey())) {
+						int length = entry.getValue().size();
+						if (count > Integer.MAX_VALUE - length) return Integer.MAX_VALUE;
+						count += length;
+					}
+				return count;
+			}
+			@Override public @NonNull String get(int index) {
+				if (index < 0) throw new IndexOutOfBoundsException();
+				for (Map.Entry<String, List<String>> entry : fields.entrySet())
+					if (name.equalsIgnoreCase(entry.getKey())) {
+						List<String> values = entry.getValue();
+						if (index < values.size()) return requireNonNull(values.get(index));
+						index -= values.size();
+					}
+				throw new IndexOutOfBoundsException();
+			}
+		};
 	}
 
-	private static @NonNull String redirectLocation(@NonNull URI location) {
+	static byte @NonNull [] bodyBytesFor(@NonNull Request request) {
+		requireNonNull(request);
+		return request.getBody().orElseGet(() -> new byte[0]);
+	}
+
+	static @NonNull String redirectLocation(@NonNull URI location) {
 		String scheme = location.getScheme();
 		if (!location.isAbsolute() || location.isOpaque() || location.getHost() == null
 				|| location.getHost().isEmpty() || location.getRawUserInfo() != null

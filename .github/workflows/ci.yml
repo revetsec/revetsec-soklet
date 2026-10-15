@@ -21,7 +21,7 @@ env:
   # This pushed commit contains the resource-validator and authorization-server APIs used by
   # these helpers, including the self-issued example.
   # ==================================================================================================
-  REVETSEC_CORE_SHA: 'd932c67594e608e457707946e903fb0b4edaaf1d'
+  REVETSEC_CORE_SHA: '30cf5833c4b784d205bbfc189815172da79de264'
 
 permissions:
   contents: read

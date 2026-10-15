@@ -17,8 +17,9 @@
 package com.revetsec.soklet;
 
 import com.revetsec.oauth.AuthorizationResponse;
+import com.revetsec.oauth.BearerTokenResult;
 import com.revetsec.oauth.OAuthException;
-import com.revetsec.oauth.OAuthResponseException;
+import com.revetsec.oauth.AuthorizationResponseParseResult;
 import com.soklet.HttpMethod;
 import com.soklet.Request;
 import org.jspecify.annotations.NonNull;
@@ -38,6 +39,7 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -48,8 +50,8 @@ final class SokletRawInputTests {
 		Request request = Request.fromRawUrl(HttpMethod.GET, "/callback?code=x%252Fy&state=a%2Bb&extra=x&extra=x");
 		String rawQuery = request.getRawQuery().orElseThrow();
 		assertEquals("code=x%252Fy&state=a%2Bb&extra=x&extra=x", rawQuery);
-		assertEquals(AuthorizationResponse.fromQueryString(rawQuery).getParameters(),
-				SokletOAuth.authorizationResponseFor(request).getParameters());
+		assertEquals(parsed(AuthorizationResponse.fromQueryStringResult(rawQuery)).getParameters(),
+				parsed(SokletOAuth.authorizationResponseResultFor(request)).getParameters());
 	}
 
 	@Test
@@ -59,9 +61,9 @@ final class SokletRawInputTests {
 				.headers(Map.of("cOnTeNt-TyPe", List.of("application/x-www-form-urlencoded; charset=UTF-8")))
 				.body(body).build();
 		assertArrayEquals(body, request.getBody().orElseThrow());
-		assertEquals(AuthorizationResponse.fromFormBody(body,
-				List.of("application/x-www-form-urlencoded; charset=UTF-8"), "source=raw%2Bquery").getParameters(),
-				SokletOAuth.authorizationResponseFor(request).getParameters());
+		assertEquals(parsed(AuthorizationResponse.fromFormBodyResult(body,
+				List.of("application/x-www-form-urlencoded; charset=UTF-8"), "source=raw%2Bquery")).getParameters(),
+				parsed(SokletOAuth.authorizationResponseResultFor(request)).getParameters());
 	}
 
 	@Test
@@ -137,14 +139,12 @@ final class SokletRawInputTests {
 	}
 
 	private static void assertMalformed(@NonNull Request request) {
-		OAuthResponseException failure = assertThrows(OAuthResponseException.class,
-				() -> SokletOAuth.authorizationResponseFor(request));
+		SokletOAuthCallbackResult.Rejected failure = assertInstanceOf(SokletOAuthCallbackResult.Rejected.class, SokletOAuth.authorizationResponseResultFor(request));
 		assertEquals(OAuthException.Reason.CALLBACK_MALFORMED, failure.getReason());
 	}
 
 	private static void assertMalformedBearer(@NonNull Request request) {
-		assertThrows(com.revetsec.oauth.AccessTokenValidationException.class,
-				() -> SokletBearer.bearerTokenFor(request));
+		assertInstanceOf(BearerTokenResult.Malformed.class, SokletBearer.bearerTokenResultFor(request));
 	}
 
 	/** Builds genuine Soklet Requests through the server's physical-header seam; reflection is test-only. */
@@ -163,4 +163,12 @@ final class SokletRawInputTests {
 			builder = builder.body(body);
 		return builder.build();
 	}
+	private static @NonNull AuthorizationResponse parsed(@NonNull SokletOAuthCallbackResult result) {
+		return assertInstanceOf(SokletOAuthCallbackResult.Succeeded.class, result).getResponse();
+	}
+
+	private static @NonNull AuthorizationResponse parsed(@NonNull AuthorizationResponseParseResult result) {
+		return assertInstanceOf(AuthorizationResponseParseResult.Succeeded.class, result).getResponse();
+	}
+
 }

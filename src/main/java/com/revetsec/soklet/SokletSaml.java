@@ -58,18 +58,20 @@ public final class SokletSaml {
      * Parses a raw ACS POST body and every materialized Content-Type value, preserving duplicates.
      *
      * @param request application-routed ACS request
-     * @return core's untrusted POST-binding parse result
+     * @return an oversized transport outcome or core's untrusted POST-binding parse result
+     * @throws IllegalArgumentException if the application route is not POST
      * @since 1.0.0
      */
     @CheckReturnValue
-    public static @NonNull SamlPostBindingParseResult postBindingResultFor(@NonNull Request request) {
+    public static @NonNull SokletRequestResult<@NonNull SamlPostBindingParseResult> postBindingResultFor(@NonNull Request request) {
         requireNonNull(request);
         if (request.getHttpMethod() != HttpMethod.POST)
             throw new IllegalArgumentException("SAML ACS route requires POST");
-        return SamlPostBindingMessage.fromFormBodyResult(
-                request.getBody().orElseGet(() -> new byte[0]),
+        if (Boolean.TRUE.equals(request.isContentTooLarge())) return SokletRequestResult.fromTooLarge();
+        return SokletRequestResult.fromResult(SamlPostBindingMessage.fromFormBodyResult(
+                SokletOAuth.bodyBytesFor(request),
                 SokletOAuth.collectHeaderValues(request, "Content-Type"),
-                request.getRawQuery().orElse(null));
+                request.getRawQuery().orElse(null)));
     }
 
     /**
@@ -78,25 +80,27 @@ public final class SokletSaml {
      * a pending cookie for a cross-site POST requires Secure, HttpOnly and SameSite=None.
      *
      * @param request application-routed logout POST request
-     * @return core's untrusted logout POST-binding parse result
+     * @return an oversized transport outcome or core's untrusted logout POST-binding parse result
+     * @throws IllegalArgumentException if the application route is not POST
      * @since 1.0.0
      */
     @CheckReturnValue
-    public static @NonNull SamlPostBindingParseResult postLogoutBindingResultFor(@NonNull Request request) {
+    public static @NonNull SokletRequestResult<@NonNull SamlPostBindingParseResult> postLogoutBindingResultFor(@NonNull Request request) {
         requireNonNull(request);
         if (request.getHttpMethod() != HttpMethod.POST)
             throw new IllegalArgumentException("SAML logout route requires POST");
-        return SamlPostBindingMessage.fromLogoutFormBodyResult(
-                request.getBody().orElseGet(() -> new byte[0]),
+        if (Boolean.TRUE.equals(request.isContentTooLarge())) return SokletRequestResult.fromTooLarge();
+        return SokletRequestResult.fromResult(SamlPostBindingMessage.fromLogoutFormBodyResult(
+                SokletOAuth.bodyBytesFor(request),
                 SokletOAuth.collectHeaderValues(request, "Content-Type"),
-                request.getRawQuery().orElse(null));
+                request.getRawQuery().orElse(null)));
     }
 
     /**
      * Parses the untouched query string for HTTP-Redirect logout signature verification.
      *
      * @param request application-routed logout GET request
-     * @return core's untrusted Redirect-binding parse result
+     * @return an oversized transport outcome or core's untrusted Redirect-binding parse result
      * @since 1.0.0
      */
     @CheckReturnValue

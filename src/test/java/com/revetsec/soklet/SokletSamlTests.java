@@ -61,7 +61,7 @@ final class SokletSamlTests {
                 .headers(Map.of("Content-Type", List.of("application/x-www-form-urlencoded")))
                 .body(body).build();
         var parsed = assertInstanceOf(SamlPostBindingParseResult.Parsed.class,
-                SokletSaml.postBindingResultFor(request));
+                SokletTransportFixtures.completed(SokletSaml.postBindingResultFor(request)));
         assertEquals("a+b", parsed.getMessage().getRelayState().orElseThrow());
 
         Request duplicated = Request.withRawUrl(HttpMethod.POST, "/acs")
@@ -69,7 +69,7 @@ final class SokletSamlTests {
                         "application/x-www-form-urlencoded"))).body(body).build();
         assertEquals(SamlPostBindingParseResult.Reason.CONTENT_TYPE,
                 assertInstanceOf(SamlPostBindingParseResult.Rejected.class,
-                        SokletSaml.postBindingResultFor(duplicated)).getReason());
+                        SokletTransportFixtures.completed(SokletSaml.postBindingResultFor(duplicated))).getReason());
     }
 
     @Test
@@ -79,7 +79,16 @@ final class SokletSamlTests {
         assertInstanceOf(SamlRedirectBindingParseResult.Rejected.class,
                 SokletSaml.redirectBindingResultFor(request));
         assertThrows(IllegalArgumentException.class,
-                () -> SokletSaml.postBindingResultFor(request));
+                () -> SokletTransportFixtures.completed(SokletSaml.postBindingResultFor(request)));
+    }
+
+    @Test
+    void discardedOversizedPostBodyFailsClosedForAcsAndLogout() {
+        Request request = Request.withRawUrl(HttpMethod.POST, "/saml")
+                .headers(Map.of("Content-Type", List.of("application/x-www-form-urlencoded")))
+                .contentTooLarge(true).build();
+        assertInstanceOf(SokletRequestResult.TooLarge.class, SokletSaml.postBindingResultFor(request));
+        assertInstanceOf(SokletRequestResult.TooLarge.class, SokletSaml.postLogoutBindingResultFor(request));
     }
 
     @Test
@@ -90,26 +99,26 @@ final class SokletSamlTests {
             Request request = Request.withRawUrl(HttpMethod.POST, "/logout?tenant=one")
                     .headers(Map.of("Content-Type", List.of("application/x-www-form-urlencoded"))).body(body).build();
             SamlPostBindingMessage message = assertInstanceOf(SamlPostBindingParseResult.Parsed.class,
-                    SokletSaml.postLogoutBindingResultFor(request)).getMessage();
+                    SokletTransportFixtures.completed(SokletSaml.postLogoutBindingResultFor(request))).getMessage();
             assertEquals("SAMLRequest".equals(field) ? SamlPostBindingMessage.Kind.REQUEST
                     : SamlPostBindingMessage.Kind.RESPONSE, message.getKind());
             assertEquals("alpha+beta", message.getRelayState().orElseThrow());
             Request polluted = Request.withRawUrl(HttpMethod.POST, "/logout?RelayState=evil")
                     .headers(request.getHeaders()).body(body).build();
             assertEquals(SamlPostBindingParseResult.Reason.QUERY, assertInstanceOf(
-                    SamlPostBindingParseResult.Rejected.class, SokletSaml.postLogoutBindingResultFor(polluted)).getReason());
+                    SamlPostBindingParseResult.Rejected.class, SokletTransportFixtures.completed(SokletSaml.postLogoutBindingResultFor(polluted))).getReason());
             Request duplicated = Request.withRawUrl(HttpMethod.POST, "/logout")
                     .headers(Map.of("Content-Type", List.of("application/x-www-form-urlencoded",
                             "application/x-www-form-urlencoded"))).body(body).build();
             assertEquals(SamlPostBindingParseResult.Reason.CONTENT_TYPE, assertInstanceOf(
-                    SamlPostBindingParseResult.Rejected.class, SokletSaml.postLogoutBindingResultFor(duplicated)).getReason());
+                    SamlPostBindingParseResult.Rejected.class, SokletTransportFixtures.completed(SokletSaml.postLogoutBindingResultFor(duplicated))).getReason());
         }
         Request requestAtAcs = Request.withRawUrl(HttpMethod.POST, "/acs")
                 .headers(Map.of("Content-Type", List.of("application/x-www-form-urlencoded")))
                 .body(("SAMLRequest=" + payload).getBytes(StandardCharsets.US_ASCII)).build();
-        assertInstanceOf(SamlPostBindingParseResult.Rejected.class, SokletSaml.postBindingResultFor(requestAtAcs));
+        assertInstanceOf(SamlPostBindingParseResult.Rejected.class, SokletTransportFixtures.completed(SokletSaml.postBindingResultFor(requestAtAcs)));
         assertThrows(IllegalArgumentException.class,
-                () -> SokletSaml.postLogoutBindingResultFor(Request.fromRawUrl(HttpMethod.GET, "/logout")));
+                () -> SokletTransportFixtures.completed(SokletSaml.postLogoutBindingResultFor(Request.fromRawUrl(HttpMethod.GET, "/logout"))));
     }
 
     @Test
@@ -128,7 +137,7 @@ final class SokletSamlTests {
         assertFalse(begin.getPostForm().getFields().containsKey("SAMLResponse"));
         Request response = logoutPostRequest(fixture.responseBody(begin.getPendingLogout()));
         SamlPostBindingMessage message = assertInstanceOf(SamlPostBindingParseResult.Parsed.class,
-                SokletSaml.postLogoutBindingResultFor(response)).getMessage();
+                SokletTransportFixtures.completed(SokletSaml.postLogoutBindingResultFor(response))).getMessage();
         var pending = fixture.pendingSource(begin.getPendingLogout());
         assertInstanceOf(SamlLogoutResult.Succeeded.class,
                 fixture.sp.completeLogoutResult(message, pending, fixture.idp));
@@ -136,7 +145,7 @@ final class SokletSamlTests {
                 fixture.sp.completeLogoutResult(message, pending, fixture.idp));
 
         SamlPostBindingMessage request = assertInstanceOf(SamlPostBindingParseResult.Parsed.class,
-                SokletSaml.postLogoutBindingResultFor(logoutPostRequest(fixture.requestBody("_idp-logout")))).getMessage();
+                SokletTransportFixtures.completed(SokletSaml.postLogoutBindingResultFor(logoutPostRequest(fixture.requestBody("_idp-logout"))))).getMessage();
         var accepted = assertInstanceOf(SamlLogoutRequestResult.Accepted.class,
                 fixture.sp.acceptLogoutRequestResult(request, fixture.idp));
         assertInstanceOf(SamlLogoutRequestResult.Rejected.class,

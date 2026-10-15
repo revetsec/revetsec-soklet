@@ -42,9 +42,9 @@ import static java.util.Objects.requireNonNull;
  * Thin SCIM transport helpers for application-routed Soklet endpoints. Applications select the authenticated caller,
  * tenant, resource type and transaction, and enforce route methods. Each parser invokes one core operation using the
  * unchanged materialized raw query, body and physical header occurrences.
- * Reject {@link Request#isContentTooLarge()} before invoking any helper, using an application response such as
- * {@code provider.errorResponse(ScimError.requestTooLargeInstance())}. Soklet discards an oversized request body;
- * passing that incomplete request to a body parser would otherwise appear to core as an empty body.
+ * Reject {@link Request#isContentTooLarge()} before invoking a body helper, using an application response such as
+ * {@code provider.errorResponse(ScimError.requestTooLargeInstance())}. Body helpers also fail closed if the caller
+ * omits this check. Soklet discards an oversized request body; the transport cannot pass it to core.
  * Configure upstream body, complete-request and header limits before requests are materialized. The application
  * also supplies authentication challenges and method-specific Allow headers when composing transport responses.
  *
@@ -69,68 +69,76 @@ public final class SokletScim {
     }
 
     /** Parses unchanged SearchRequest bytes and original Content-Type occurrences.
-     * The application must reject {@code request.isContentTooLarge()} before calling this helper.
+     * The application should reject {@code request.isContentTooLarge()} to emit an appropriate HTTP response.
      * @param provider the application's configured service provider
      * @param resourceType the application-selected registered resource type
      * @param request the materialized routed request
      * @return the core query result
+
      * @since 1.0.0
      */
     @CheckReturnValue
-    public static @NonNull ScimQueryParseResult searchRequestResultFor(@NonNull ScimServiceProvider provider,
+    public static @NonNull SokletRequestResult<@NonNull ScimQueryParseResult> searchRequestResultFor(@NonNull ScimServiceProvider provider,
             @NonNull ScimResourceType resourceType, @NonNull Request request) {
         requireNonNull(provider); requireNonNull(resourceType); requireNonNull(request);
-        return provider.parseSearchRequestResult(resourceType, headerValues(request, "Content-Type"),
-                request.getBody().orElseGet(() -> new byte[0]));
+        if (Boolean.TRUE.equals(request.isContentTooLarge())) return SokletRequestResult.fromTooLarge();
+        return SokletRequestResult.fromResult(provider.parseSearchRequestResult(resourceType, headerValues(request, "Content-Type"),
+                SokletOAuth.bodyBytesFor(request)));
     }
 
     /** Parses unchanged create-resource bytes and original Content-Type occurrences.
-     * The application must reject {@code request.isContentTooLarge()} before calling this helper.
+     * The application should reject {@code request.isContentTooLarge()} to emit an appropriate HTTP response.
      * @param provider the application's configured service provider
      * @param resourceType the application-selected registered resource type
      * @param request the materialized routed request
      * @return the core candidate resource result
+
      * @since 1.0.0
      */
     @CheckReturnValue
-    public static @NonNull ScimResourceParseResult resourceResultFor(@NonNull ScimServiceProvider provider,
+    public static @NonNull SokletRequestResult<@NonNull ScimResourceParseResult> resourceResultFor(@NonNull ScimServiceProvider provider,
             @NonNull ScimResourceType resourceType, @NonNull Request request) {
         requireNonNull(provider); requireNonNull(resourceType); requireNonNull(request);
-        return provider.parseResourceResult(resourceType, headerValues(request, "Content-Type"),
-                request.getBody().orElseGet(() -> new byte[0]));
+        if (Boolean.TRUE.equals(request.isContentTooLarge())) return SokletRequestResult.fromTooLarge();
+        return SokletRequestResult.fromResult(provider.parseResourceResult(resourceType, headerValues(request, "Content-Type"),
+                SokletOAuth.bodyBytesFor(request)));
     }
 
     /** Parses unchanged replacement bytes against the application-selected current resource.
-     * The application must reject {@code request.isContentTooLarge()} before calling this helper.
+     * The application should reject {@code request.isContentTooLarge()} to emit an appropriate HTTP response.
      * @param provider the application's configured service provider
      * @param resourceType the application-selected registered resource type
      * @param current the authoritative current resource used by the application transaction
      * @param request the materialized routed request
      * @return the core replacement candidate result
+
      * @since 1.0.0
      */
     @CheckReturnValue
-    public static @NonNull ScimResourceParseResult replacementResultFor(@NonNull ScimServiceProvider provider,
+    public static @NonNull SokletRequestResult<@NonNull ScimResourceParseResult> replacementResultFor(@NonNull ScimServiceProvider provider,
             @NonNull ScimResourceType resourceType, @NonNull ScimResource current, @NonNull Request request) {
         requireNonNull(provider); requireNonNull(resourceType); requireNonNull(current); requireNonNull(request);
-        return provider.parseReplacementResult(resourceType, current, headerValues(request, "Content-Type"),
-                request.getBody().orElseGet(() -> new byte[0]));
+        if (Boolean.TRUE.equals(request.isContentTooLarge())) return SokletRequestResult.fromTooLarge();
+        return SokletRequestResult.fromResult(provider.parseReplacementResult(resourceType, current, headerValues(request, "Content-Type"),
+                SokletOAuth.bodyBytesFor(request)));
     }
 
     /** Parses unchanged PatchOp bytes and original Content-Type occurrences.
-     * The application must reject {@code request.isContentTooLarge()} before calling this helper.
+     * The application should reject {@code request.isContentTooLarge()} to emit an appropriate HTTP response.
      * @param provider the application's configured service provider
      * @param resourceType the application-selected registered resource type
      * @param request the materialized routed request
      * @return the core schema-bound PATCH request result
+
      * @since 1.0.0
      */
     @CheckReturnValue
-    public static @NonNull ScimPatchParseResult patchRequestResultFor(@NonNull ScimServiceProvider provider,
+    public static @NonNull SokletRequestResult<@NonNull ScimPatchParseResult> patchRequestResultFor(@NonNull ScimServiceProvider provider,
             @NonNull ScimResourceType resourceType, @NonNull Request request) {
         requireNonNull(provider); requireNonNull(resourceType); requireNonNull(request);
-        return provider.parsePatchRequestResult(resourceType, headerValues(request, "Content-Type"),
-                request.getBody().orElseGet(() -> new byte[0]));
+        if (Boolean.TRUE.equals(request.isContentTooLarge())) return SokletRequestResult.fromTooLarge();
+        return SokletRequestResult.fromResult(provider.parsePatchRequestResult(resourceType, headerValues(request, "Content-Type"),
+                SokletOAuth.bodyBytesFor(request)));
     }
 
     /** Parses resource-response selection from the unchanged raw query.

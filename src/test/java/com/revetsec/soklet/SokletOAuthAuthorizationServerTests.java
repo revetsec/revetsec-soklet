@@ -20,6 +20,7 @@ import com.revetsec.StateSealer;
 import com.revetsec.oauth.server.*;
 import com.soklet.*;
 import java.net.URI;
+import java.lang.reflect.Constructor;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -41,18 +42,21 @@ final class SokletOAuthAuthorizationServerTests {
  private static final String BINDING="A".repeat(43),VERIFIER="dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",CHALLENGE="E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
  private static final Clock CLOCK=Clock.fixed(Instant.parse("2026-10-06T12:00:00Z"),ZoneOffset.UTC);
  private static @NonNull OAuthAuthorizationServer server(boolean failing) throws Exception {
+  return server(failing, OAuthServerObserver.disabledInstance());
+ }
+ private static @NonNull OAuthAuthorizationServer server(boolean failing, @NonNull OAuthServerObserver observer) throws Exception {
   var generator=KeyPairGenerator.getInstance("RSA");generator.initialize(2048);KeyPair pair=generator.generateKeyPair();
   var client=OAuthServerClientRegistration.withClientId("client").configurationVersion("v1").redirectUris(List.of(URI.create(REDIRECT)))
     .allowedScopesByResource(Map.of(RESOURCE,Set.of("read"))).build();
   byte[] sealing=new byte[32];for(int i=0;i<32;i++)sealing[i]=(byte)(i+1);
   var server=OAuthAuthorizationServer.withIssuer("https://issuer.example").authorizationEndpoint(URI.create("https://issuer.example/authorize"))
-    .tokenEndpoint(URI.create("https://issuer.example/token")).jsonWebKeySetEndpoint(URI.create("https://issuer.example/jwks"))
+    .tokenEndpoint(URI.create("https://issuer.example/token")).jwksEndpoint(URI.create("https://issuer.example/jwks"))
     .revocationEndpoint(URI.create("https://issuer.example/revoke")).introspectionEndpoint(URI.create("https://issuer.example/introspect"))
     .clientRepository((id,b)->Optional.of(client)).store(new Store(failing)).clock(CLOCK)
     .stateSealer(StateSealer.withActiveKey(SealingKey.fromBase64("seal",Base64.getEncoder().encodeToString(sealing))).build())
     .signingKeys(OAuthIssuerKeyProvider.fromSnapshot(OAuthIssuerKeySnapshot.withActiveKey(OAuthIssuerSigningKey.fromKeyPair("key",pair.getPrivate(),pair.getPublic())).generation("g1").publishedAt(CLOCK.instant().minusSeconds(120)).build()))
     .grantPolicy((c,b)->OAuthAuthorizationDecision.withSubject(c.getSubject()).authorizedScopesByResource(c.getAuthorizedScopesByResource()).build())
-    .resources(Map.of(RESOURCE,Set.of("read"))).build();
+    .observer(observer).resources(Map.of(RESOURCE,Set.of("read"))).build();
   if(!failing) {assertEquals(OAuthStoreCommitStatus.COMMITTED,server.initializeFreshIssuer());server.establishNewSubject("subject");}
   return server;
  }
@@ -74,25 +78,40 @@ final class SokletOAuthAuthorizationServerTests {
    .map(form->DynamicTest.dynamicTest("raw form bytes "+form.length(),()->{
     var s=server(false);var request=post("/token",form.getBytes(StandardCharsets.UTF_8),fields());
     same(assertInstanceOf(OAuthTokenResult.Rejected.class,s.tokenResult("POST",null,request.getBody().orElseThrow(),rawFields(request))).getResponse(),
-      assertInstanceOf(OAuthTokenResult.Rejected.class,SokletOAuthAuthorizationServer.tokenResultFor(s,request)).getResponse());
+      assertInstanceOf(OAuthTokenResult.Rejected.class,SokletTransportFixtures.completed(SokletOAuthAuthorizationServer.tokenResultFor(s,request))).getResponse());
    }));
  }
  @TestFactory @NonNull Stream<@NonNull DynamicTest> everyDistinctPhysicalFieldReachesCore() {
   return Stream.of("Content-Type","Authorization","Content-Encoding").map(name->DynamicTest.dynamicTest(name,()->{
    var s=server(false);var request=SokletRawInputTests.fromPhysicalHeaders(HttpMethod.POST,"/token",List.of(Map.entry("Content-Type","application/x-www-form-urlencoded"),Map.entry(name,name.equals("Content-Type")?"text/plain":"first"),Map.entry(name.toUpperCase(Locale.ROOT),"second")),"grant_type=authorization_code".getBytes(StandardCharsets.UTF_8));
-   same(assertInstanceOf(OAuthTokenResult.Rejected.class,s.tokenResult("POST",null,request.getBody().orElseThrow(),rawFields(request))).getResponse(),assertInstanceOf(OAuthTokenResult.Rejected.class,SokletOAuthAuthorizationServer.tokenResultFor(s,request)).getResponse());
+   same(assertInstanceOf(OAuthTokenResult.Rejected.class,s.tokenResult("POST",null,request.getBody().orElseThrow(),rawFields(request))).getResponse(),assertInstanceOf(OAuthTokenResult.Rejected.class,SokletTransportFixtures.completed(SokletOAuthAuthorizationServer.tokenResultFor(s,request))).getResponse());
   }));
  }
  @Test void methodAndQueryRejectionsUsePreparedCoreResponses() throws Exception {
   var s=server(false);var request=Request.fromRawUrl(HttpMethod.GET,"/token?raw=x%2By");
-  same(assertInstanceOf(OAuthTokenResult.Rejected.class,s.tokenResult("GET","raw=x%2By",new byte[0],Map.of())).getResponse(),assertInstanceOf(OAuthTokenResult.Rejected.class,SokletOAuthAuthorizationServer.tokenResultFor(s,request)).getResponse());
-  assertEquals(405,assertInstanceOf(OAuthRevocationResult.Rejected.class,SokletOAuthAuthorizationServer.revocationResultFor(s,request)).getResponse().getStatusCode());
-  assertEquals(405,assertInstanceOf(OAuthIntrospectionResult.Rejected.class,SokletOAuthAuthorizationServer.introspectionResultFor(s,request)).getResponse().getStatusCode());
+  same(assertInstanceOf(OAuthTokenResult.Rejected.class,s.tokenResult("GET","raw=x%2By",new byte[0],Map.of())).getResponse(),assertInstanceOf(OAuthTokenResult.Rejected.class,SokletTransportFixtures.completed(SokletOAuthAuthorizationServer.tokenResultFor(s,request))).getResponse());
+  assertEquals(405,assertInstanceOf(OAuthRevocationResult.Rejected.class,SokletTransportFixtures.completed(SokletOAuthAuthorizationServer.revocationResultFor(s,request))).getResponse().getStatusCode());
+  assertEquals(405,assertInstanceOf(OAuthIntrospectionResult.Rejected.class,SokletTransportFixtures.completed(SokletOAuthAuthorizationServer.introspectionResultFor(s,request))).getResponse().getStatusCode());
+ }
+ @Test void discardedOversizedBodyFailsClosedAtEveryIssuerIngress() throws Exception {
+  var calls = new java.util.concurrent.atomic.AtomicInteger();
+  var observer = new OAuthServerObserver() {
+   @Override public void willHandleEndpoint(@NonNull Endpoint endpoint) { calls.incrementAndGet(); }
+  };
+  var s=server(false, observer);
+  int before=calls.get();
+  var request=Request.withRawUrl(HttpMethod.POST,"/issuer")
+    .headers(fields()).contentTooLarge(true).build();
+  assertInstanceOf(SokletRequestResult.TooLarge.class, SokletOAuthAuthorizationServer.beginAuthorizationResultFor(s,request,BINDING));
+  assertInstanceOf(SokletRequestResult.TooLarge.class, SokletOAuthAuthorizationServer.tokenResultFor(s,request));
+  assertInstanceOf(SokletRequestResult.TooLarge.class, SokletOAuthAuthorizationServer.revocationResultFor(s,request));
+  assertInstanceOf(SokletRequestResult.TooLarge.class, SokletOAuthAuthorizationServer.introspectionResultFor(s,request));
+  assertEquals(before,calls.get(), "discarded bodies must not invoke the issuer engine");
  }
  @Test void authorizationRetainsEncodedRedirectRawQueryAndIndependentBinding() throws Exception {
   var s=server(false);String query="client_id=client&response_type=code&redirect_uri="+java.net.URLEncoder.encode(REDIRECT,StandardCharsets.UTF_8)+"&resource="+java.net.URLEncoder.encode(RESOURCE,StandardCharsets.UTF_8)+"&code_challenge="+CHALLENGE+"&code_challenge_method=S256&state=raw%2Bstate";
   var request=Request.fromRawUrl(HttpMethod.GET,"/authorize?"+query);
-  var interaction=assertInstanceOf(OAuthAuthorizationResult.InteractionRequired.class,SokletOAuthAuthorizationServer.beginAuthorizationResultFor(s,request,BINDING)).getInteraction();
+  var interaction=assertInstanceOf(OAuthAuthorizationResult.InteractionRequired.class,SokletTransportFixtures.completed(SokletOAuthAuthorizationServer.beginAuthorizationResultFor(s,request,BINDING))).getInteraction();
   assertInstanceOf(OAuthAuthorizationResult.Rejected.class,s.resumeAuthorizationResult(interaction.getInteractionValue(),"B".repeat(42)+"A"));
   var completed=assertInstanceOf(OAuthAuthorizationResult.Completed.class,s.completeAuthorizationResult(interaction.getInteractionValue(),BINDING,OAuthAuthorizationDecision.withSubject("subject").authorizedScopesByResource(Map.of(RESOURCE,Set.of("read"))).build()));
   var prepared=completed.getResponse();var response=SokletOAuthAuthorizationServer.responseFor(prepared);
@@ -100,23 +119,30 @@ final class SokletOAuthAuthorizationServerTests {
   assertTrue(Objects.requireNonNull(response.getHeaders().get("Location")).iterator().next().startsWith(REDIRECT+"&code="));
   String location=prepared.getLocationWithCredentials().orElseThrow().toString();String code=location.substring(location.indexOf("code=")+5,location.indexOf("&state="));
   String form="grant_type=authorization_code&client_id=client&resource="+java.net.URLEncoder.encode(RESOURCE,StandardCharsets.UTF_8)+"&redirect_uri="+java.net.URLEncoder.encode(REDIRECT,StandardCharsets.UTF_8)+"&code="+code+"&code_verifier="+VERIFIER;
-  var token=assertInstanceOf(OAuthTokenResult.Succeeded.class,SokletOAuthAuthorizationServer.tokenResultFor(s,post("/token",form.getBytes(StandardCharsets.UTF_8),fields()))).getResponse();
+  var token=assertInstanceOf(OAuthTokenResult.Succeeded.class,SokletTransportFixtures.completed(SokletOAuthAuthorizationServer.tokenResultFor(s,post("/token",form.getBytes(StandardCharsets.UTF_8),fields())))).getResponse();
   assertArrayEquals(token.toHttpBodyWithCredentials(),body(SokletOAuthAuthorizationServer.responseFor(token)));
  }
  @Test void metadataJwksAndHeadEmitExactBodies() throws Exception {
-  var s=server(false);for(var prepared:List.of(s.metadataResponse("GET"),s.metadataResponse("HEAD"),s.jsonWebKeySetResponse("GET"),s.jsonWebKeySetResponse("HEAD"))) {
+  var s=server(false);for(var prepared:List.of(s.metadataResponse("GET"),s.metadataResponse("HEAD"),s.jwksResponse("GET"),s.jwksResponse("HEAD"))) {
    var response=SokletOAuthAuthorizationServer.responseFor(prepared);assertEquals(prepared.getStatusCode(),response.getStatusCode());assertArrayEquals(prepared.toHttpBodyWithCredentials(),body(response));
    prepared.getHeaders().forEach((k,v)->assertEquals(List.copyOf(v),response.getHeaders().get(k)));
   }
  }
+ @Test void issuerResponseRejectsEncodedControlWithoutLeakingCredential() throws Exception {
+  Constructor<OAuthServerResponse> constructor=OAuthServerResponse.class.getDeclaredConstructor(int.class,Map.class,URI.class,byte[].class,byte[].class);
+  constructor.setAccessible(true);
+  OAuthServerResponse unsafe=constructor.newInstance(303,Map.of(),URI.create("https://client.example/cb?code=private-secret&x=%0A"),new byte[0],new byte[0]);
+  IllegalArgumentException failure=assertThrows(IllegalArgumentException.class,()->SokletOAuthAuthorizationServer.responseFor(unsafe));
+  assertFalse(Objects.requireNonNull(failure.getMessage()).contains("private-secret"));
+ }
  @Test void infrastructureFailurePropagatesAsTypedFailure() throws Exception {
   var s=server(true);String query="client_id=client&response_type=code&redirect_uri="+java.net.URLEncoder.encode(REDIRECT,StandardCharsets.UTF_8)+"&resource="+java.net.URLEncoder.encode(RESOURCE,StandardCharsets.UTF_8)+"&code_challenge="+CHALLENGE+"&code_challenge_method=S256";
-  var failure=assertThrows(OAuthServerException.class,()->SokletOAuthAuthorizationServer.beginAuthorizationResultFor(s,Request.fromRawUrl(HttpMethod.GET,"/authorize?"+query),BINDING));assertFalse(Objects.requireNonNull(failure.getMessage()).contains("private-storage-diagnostic"));
+  var failure=assertThrows(OAuthServerException.class,()->SokletTransportFixtures.completed(SokletOAuthAuthorizationServer.beginAuthorizationResultFor(s,Request.fromRawUrl(HttpMethod.GET,"/authorize?"+query),BINDING)));assertFalse(Objects.requireNonNull(failure.getMessage()).contains("private-storage-diagnostic"));
  }
  @Test @SuppressWarnings("NullAway") void requiredPrimaryArgumentsRejectNull() throws Exception {
   var s=server(false);var r=Request.fromPath(HttpMethod.GET,"/");
-  assertThrows(NullPointerException.class,()->SokletOAuthAuthorizationServer.tokenResultFor(null,r));assertThrows(NullPointerException.class,()->SokletOAuthAuthorizationServer.tokenResultFor(s,null));
-  assertThrows(NullPointerException.class,()->SokletOAuthAuthorizationServer.beginAuthorizationResultFor(s,r,null));assertThrows(NullPointerException.class,()->SokletOAuthAuthorizationServer.responseFor(null));
+  assertThrows(NullPointerException.class,()->SokletTransportFixtures.completed(SokletOAuthAuthorizationServer.tokenResultFor(null,r)));assertThrows(NullPointerException.class,()->SokletTransportFixtures.completed(SokletOAuthAuthorizationServer.tokenResultFor(s,null)));
+  assertThrows(NullPointerException.class,()->SokletTransportFixtures.completed(SokletOAuthAuthorizationServer.beginAuthorizationResultFor(s,r,null)));assertThrows(NullPointerException.class,()->SokletOAuthAuthorizationServer.responseFor(null));
  }
  private static final class Store implements OAuthAuthorizationServerStore {
   private final Map<OAuthStoreKey,OAuthStoreEntry> rows=new LinkedHashMap<>();private final boolean failing;

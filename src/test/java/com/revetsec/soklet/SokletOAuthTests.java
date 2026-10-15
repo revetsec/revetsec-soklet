@@ -19,7 +19,6 @@ package com.revetsec.soklet;
 import com.revetsec.oauth.AuthorizationRequestOptions;
 import com.revetsec.oauth.AuthorizationResponse;
 import com.revetsec.oauth.OAuthException;
-import com.revetsec.oauth.OAuthResponseException;
 import com.soklet.HttpMethod;
 import com.soklet.Request;
 import com.soklet.Response;
@@ -38,6 +37,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -47,8 +47,8 @@ final class SokletOAuthTests {
 
 	@Test
 	void getPreservesRawEncodingAndRouteMode() {
-		AuthorizationResponse response = SokletOAuth.authorizationResponseFor(Request.fromRawUrl(HttpMethod.GET,
-				"/callback?code=a%2Bb%252Fc&state=x+y&extra=%E2%98%83"));
+		AuthorizationResponse response = parsed(SokletOAuth.authorizationResponseResultFor(Request.fromRawUrl(HttpMethod.GET,
+				"/callback?code=a%2Bb%252Fc&state=x+y&extra=%E2%98%83")));
 		assertEquals("a+b%2Fc", response.getCode().orElseThrow());
 		assertEquals("x y", response.getState().orElseThrow());
 		assertEquals(List.of("☃"), response.getParameters().get("extra"));
@@ -60,12 +60,12 @@ final class SokletOAuthTests {
 		Request request = Request.withRawUrl(HttpMethod.GET, "/callback?code=query&state=trusted-route")
 				.headers(Map.of("Content-Type", List.of("text/plain")))
 				.body("code=body&state=body".getBytes(StandardCharsets.UTF_8)).build();
-		assertEquals("query", SokletOAuth.authorizationResponseFor(request).getCode().orElseThrow());
+		assertEquals("query", parsed(SokletOAuth.authorizationResponseResultFor(request)).getCode().orElseThrow());
 	}
 
 	@Test
 	void emptyGetQueryRemainsAnEmptyUntrustedResponse() {
-		assertTrue(SokletOAuth.authorizationResponseFor(Request.fromPath(HttpMethod.GET, "/callback"))
+		assertTrue(parsed(SokletOAuth.authorizationResponseResultFor(Request.fromPath(HttpMethod.GET, "/callback")))
 				.getParameters().isEmpty());
 	}
 
@@ -79,8 +79,8 @@ final class SokletOAuthTests {
 
 	@Test
 	void repeatedNonProtocolQueryValuesRemainVisible() {
-		AuthorizationResponse response = SokletOAuth.authorizationResponseFor(Request.fromRawUrl(HttpMethod.GET,
-				"/callback?code=a&extra=x&extra=x&extra=y"));
+		AuthorizationResponse response = parsed(SokletOAuth.authorizationResponseResultFor(Request.fromRawUrl(HttpMethod.GET,
+				"/callback?code=a&extra=x&extra=x&extra=y")));
 		assertEquals(List.of("x", "x", "y"), response.getParameters().get("extra"));
 	}
 
@@ -88,7 +88,7 @@ final class SokletOAuthTests {
 	void postPreservesRawBodyEncodingAndSafeQueryExtras() {
 		Request request = post("/callback?source=a%2Bb", "code=a%2Bb%252Fc&state=x+y",
 				"Application/X-WWW-Form-Urlencoded; charset=\"UTF-8\"");
-		AuthorizationResponse response = SokletOAuth.authorizationResponseFor(request);
+		AuthorizationResponse response = parsed(SokletOAuth.authorizationResponseResultFor(request));
 		assertEquals("a+b%2Fc", response.getCode().orElseThrow());
 		assertEquals("x y", response.getState().orElseThrow());
 		assertEquals(List.of("a+b"), response.getParameters().get("source"));
@@ -99,7 +99,24 @@ final class SokletOAuthTests {
 	void postAbsentBodyStillUsesTheRawMimeContract() {
 		Request request = Request.withRawUrl(HttpMethod.POST, "/callback")
 				.headers(Map.of("Content-Type", List.of("application/x-www-form-urlencoded"))).build();
-		assertTrue(SokletOAuth.authorizationResponseFor(request).getParameters().isEmpty());
+		assertTrue(parsed(SokletOAuth.authorizationResponseResultFor(request)).getParameters().isEmpty());
+	}
+
+	@Test
+	void discardedOversizedPostBodyFailsClosed() {
+		Request request = Request.withRawUrl(HttpMethod.POST, "/callback")
+				.headers(Map.of("Content-Type", List.of("application/x-www-form-urlencoded")))
+				.contentTooLarge(true).build();
+		assertInstanceOf(SokletOAuthCallbackResult.TooLarge.class,
+				SokletOAuth.authorizationResponseResultFor(request));
+	}
+
+	@Test
+	void discardedOversizedGetBodyFailsClosedBeforeQueryParsing() {
+		Request request = Request.withRawUrl(HttpMethod.GET, "/callback?code=synthetic")
+				.contentTooLarge(true).build();
+		assertInstanceOf(SokletOAuthCallbackResult.TooLarge.class,
+				SokletOAuth.authorizationResponseResultFor(request));
 	}
 
 	@TestFactory
@@ -122,7 +139,7 @@ final class SokletOAuthTests {
 		return Stream.of(HttpMethod.PUT, HttpMethod.PATCH, HttpMethod.DELETE, HttpMethod.HEAD, HttpMethod.OPTIONS)
 				.map(method -> DynamicTest.dynamicTest(method.name(), () -> {
 					IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
-							() -> SokletOAuth.authorizationResponseFor(Request.fromPath(method, "/callback")));
+							() -> parsed(SokletOAuth.authorizationResponseResultFor(Request.fromPath(method, "/callback"))));
 					assertEquals("OAuth callback route must use GET or POST", failure.getMessage());
 				}));
 	}
@@ -172,7 +189,7 @@ final class SokletOAuthTests {
 	@SuppressWarnings("NullAway") // Intentionally violates required-argument contracts.
 	@Test
 	void nullArgumentsFail() {
-		assertThrows(NullPointerException.class, () -> SokletOAuth.authorizationResponseFor(null));
+		assertThrows(NullPointerException.class, () -> parsed(SokletOAuth.authorizationResponseResultFor(null)));
 		assertThrows(NullPointerException.class, () -> SokletOAuth.redirect(null));
 		assertThrows(NullPointerException.class, () -> SokletOAuth.redirect(URI.create("https://issuer.example.test/"), null));
 	}
@@ -183,8 +200,7 @@ final class SokletOAuthTests {
 	}
 
 	private static void assertMalformed(@NonNull Request request) {
-		OAuthResponseException failure = assertThrows(OAuthResponseException.class,
-				() -> SokletOAuth.authorizationResponseFor(request));
+		SokletOAuthCallbackResult.Rejected failure = assertInstanceOf(SokletOAuthCallbackResult.Rejected.class, SokletOAuth.authorizationResponseResultFor(request));
 		assertEquals(OAuthException.Reason.CALLBACK_MALFORMED, failure.getReason());
 	}
 
@@ -195,4 +211,8 @@ final class SokletOAuthTests {
 		assertEquals(List.of("no-referrer"), response.getHeaders().get("Referrer-Policy"));
 		assertTrue(response.getBody().isEmpty());
 	}
+	private static @NonNull AuthorizationResponse parsed(@NonNull SokletOAuthCallbackResult result) {
+		return assertInstanceOf(SokletOAuthCallbackResult.Succeeded.class, result).getResponse();
+	}
+
 }

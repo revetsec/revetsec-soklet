@@ -13,7 +13,7 @@ This adapter connects the two. Its helpers pass a Soklet `Request` to Revetsec c
 Implemented static helpers:
 
 - `SokletOAuth`: the authorization response of an OAuth or OpenID Connect callback, from a GET query or a POST form, and redirect responses with `Cache-Control: no-store` and `Referrer-Policy: no-referrer`
-- `SokletBearer`: a request's bearer token, for resource servers such as MCP endpoints
+- `SokletBearer`: a request's bearer parse result (absent, unverified present or malformed), for resource servers such as MCP endpoints
 - `SokletOAuthAuthorizationServer`: raw authorization, token, revocation and introspection input and exact-byte core response mapping
 
 `SokletSaml` passes the original ACS POST body, Content-Type header multiplicity and raw
@@ -26,12 +26,13 @@ SCIM helpers translate raw query/body data, conditional headers and core-prepare
 ### Usage
 
 ```java
-AuthorizationResponse callback = SokletOAuth.authorizationResponseFor(request);
-Optional<BearerToken> bearer = SokletBearer.bearerTokenFor(request);
+SokletOAuthCallbackResult callback =
+  SokletOAuth.authorizationResponseResultFor(request);
+BearerTokenResult bearerResult = SokletBearer.bearerTokenResultFor(request);
 Response redirect = SokletOAuth.redirect(authorizationUri, responseCookies);
 ```
 
-The callback helper accepts GET or form POST and preserves a POST query alongside its raw body. Unsupported methods are app misuse. Configure trusted callback/provider URLs in the application. Pass the parsed callback and bound pending reference to the configured OAuth/OIDC client. A parsed bearer still requires access-token validation and an application permission check.
+The callback helper accepts GET or form POST and preserves a POST query alongside its raw body. Return 405 for other callback methods, including HEAD, before reading or consuming pending login state; Soklet may dispatch HEAD to a GET route. Configure trusted callback/provider URLs in the application. Handle a rejected parse as malformed input and an oversized outcome as a discarded request body. Pass the callback from a successful parse and the bound pending reference to the configured OAuth/OIDC client. The bearer parser exposes absent, malformed and present outcomes directly. A parsed bearer still requires access-token validation and an application permission check.
 
 ### SAML HTTP-POST logout
 
@@ -95,7 +96,7 @@ dependencies {
 
 This adapter is **pre-release**, like Revetsec core. The helpers use only public Revetsec APIs. OAuth callbacks retain raw query/body text and every distinct materialized Content-Type value. Bearer parsing retains every distinct materialized Authorization value and rejects ambiguity in core; it grants no identity or permission. Applications select validators and make scope/authorization decisions.
 
-Soklet 4 represents header values as lists. These helpers collect every materialized occurrence, including identical duplicates and differently cased names, so core can reject ambiguous Authorization and Content-Type fields. The trusted HTTP edge remains responsible for framing, complete-request and header limits before materialization.
+Soklet 4 represents header values as lists. These helpers collect every materialized occurrence, including identical duplicates and differently cased names, so core can reject ambiguous Authorization and Content-Type fields. The OAuth callback helper returns its explicit `TooLarge` outcome when Soklet discarded a body. The issuer, SAML POST and SCIM body helpers return `SokletRequestResult<T>`: handle `TooLarge` before continuing, then inspect `Completed.getResult()` for the actual core protocol outcome. A discarded body never invokes the core operation. Map it to the application's oversized-request response. The trusted HTTP edge remains responsible for framing, complete-request and header limits before materialization.
 
 Redirect helpers accept an absolute HTTP(S) URI without userinfo, reject unsafe URI text, and return 302 with no-store/no-referrer headers and optional application cookies. The app supplies the redirect URI. Core chooses and validates provider endpoints.
 
@@ -131,13 +132,13 @@ OAuthIntrospectionResult checked = SokletOAuthAuthorizationServer.introspectionR
 MarshaledResponse response = SokletOAuthAuthorizationServer.responseFor(preparedCoreResponse);
 ```
 
-Use each helper on its configured route. Render interactions in the app and call core directly to resume/complete consent. Metadata/JWKS use `responseFor(server.metadataResponse(method))` and `responseFor(server.jsonWebKeySetResponse(method))`. Expected failures remain core results; typed infrastructure failures propagate for mapping with `server.responseForFailure(failure)`.
+Use each helper on its configured route. Render interactions in the app and call core directly to resume/complete consent. Metadata/JWKS use `responseFor(server.metadataResponse(method))` and `responseFor(server.jwksResponse(method))`. Expected failures remain core results; typed infrastructure failures propagate for mapping with `server.responseForFailure(failure)`.
 
 `responseFor` preserves prepared bytes/status/headers and optional credential-bearing Location, bypassing JSON marshalling. Add app cookies separately and keep credential-bearing responses out of diagnostics. Soklet 4's header lists retain materialized multiplicity, including identical values and differently cased names; core rejects ambiguous protocol fields. Reject incomplete or oversized requests and enforce physical framing limits at the trusted edge. See core's unpublished self-issued MCP example for app-owned authentication and explicit volatile-storage qualification.
 
 SCIM schema/resource/query/response transport helpers are available through `SokletScim`. They preserve raw query/body data, physical header occurrences and prepared response bytes. The PATCH helper binds ordered operations through the core parser. See the core [SCIM server guide](../revetsec/docs/scim-server-primitives.md).
 
-Reject `request.isContentTooLarge()` before invoking any SCIM helper. Soklet discards an oversized body, so passing that incomplete request to a parser would appear to core as an empty body. Configure upstream body, complete-request and header limits before materialization. For example, after authenticating and resolving the tenant:
+Reject `request.isContentTooLarge()` before invoking a SCIM body helper so the application can emit a SCIM 413 response. The body helpers also reject a discarded body if this check is missed. Configure upstream body, complete-request and header limits before materialization. For example, after authenticating and resolving the tenant:
 
 ```java
 if (request.isContentTooLarge()) {
@@ -155,3 +156,5 @@ return denied.copy().headers(headers ->
 ```
 
 A 405 response needs an `Allow` header for the actual target route, using the same copier pattern. Add only methods that route implements. Host-added headers and actual HTTP framing remain subject to the application's transport limits.
+
+Standalone public-key publication without an OAuth authorization server is available through `JwksMarshaledResponse` and `JwksResponse`; see the [JWKS usage guide](docs/jwks.md) for prod/nonprod RS384 certificate chains and other supported algorithms. The `JwksMarshaledResponse.from(...)` factory returns prepared bytes for the default marshaler; `JwksResponse.from(...)` returns a typed `Response` body for application-owned JSON serialization, with a weak ETag.

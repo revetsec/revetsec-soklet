@@ -16,9 +16,8 @@
 
 package com.revetsec.soklet;
 
-import com.revetsec.oauth.AccessTokenValidationException;
-import com.revetsec.oauth.BearerError;
 import com.revetsec.oauth.BearerToken;
+import com.revetsec.oauth.BearerTokenResult;
 import com.soklet.HttpMethod;
 import com.soklet.Request;
 import org.jspecify.annotations.NonNull;
@@ -34,14 +33,28 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class SokletBearerTests {
 
 	@Test
+	void resultApiDistinguishesAbsentPresentAndMalformedWithoutThrowing() {
+		assertInstanceOf(BearerTokenResult.Absent.class,
+				SokletBearer.bearerTokenResultFor(Request.fromPath(HttpMethod.GET, "/resource")));
+		BearerTokenResult.Present present = assertInstanceOf(BearerTokenResult.Present.class,
+				SokletBearer.bearerTokenResultFor(request("Authorization", List.of("Bearer synthetic"))));
+		assertEquals("BearerToken{value=<redacted>}", present.getToken().toString());
+		assertInstanceOf(BearerTokenResult.Malformed.class,
+				SokletBearer.bearerTokenResultFor(request("Authorization", List.of("Bearer invalid token"))));
+		assertInstanceOf(BearerTokenResult.Malformed.class,
+				SokletBearer.bearerTokenResultFor(request("Authorization", List.of("Bearer first", "Bearer second"))));
+	}
+
+	@Test
 	void absentAuthorizationRemainsAbsent() {
-		assertTrue(SokletBearer.bearerTokenFor(Request.fromPath(HttpMethod.GET, "/resource")).isEmpty());
+		assertInstanceOf(BearerTokenResult.Absent.class,
+				SokletBearer.bearerTokenResultFor(Request.fromPath(HttpMethod.GET, "/resource")));
 	}
 
 	@Test
@@ -50,7 +63,7 @@ final class SokletBearerTests {
 				.headers(Map.of("Content-Type", List.of("application/x-www-form-urlencoded"),
 						"Cookie", List.of("access_token=synthetic-cookie")))
 				.body("access_token=synthetic-body".getBytes(StandardCharsets.UTF_8)).build();
-		assertTrue(SokletBearer.bearerTokenFor(request).isEmpty());
+		assertInstanceOf(BearerTokenResult.Absent.class, SokletBearer.bearerTokenResultFor(request));
 	}
 
 	@TestFactory
@@ -58,7 +71,8 @@ final class SokletBearerTests {
 		return Stream.of("Bearer synthetic", "bEaReR synthetic", "Bearer  synthetic", "Bearer " + " ".repeat(57) + "synthetic",
 				"Bearer A.Z-_/+~09==", "Bearer " + "a".repeat(65_536))
 				.map(field -> DynamicTest.dynamicTest("valid field length " + field.length(), () -> {
-					BearerToken token = SokletBearer.bearerTokenFor(request("aUtHoRiZaTiOn", List.of(field))).orElseThrow();
+					BearerToken token = assertInstanceOf(BearerTokenResult.Present.class,
+							SokletBearer.bearerTokenResultFor(request("aUtHoRiZaTiOn", List.of(field)))).getToken();
 					assertEquals("BearerToken{value=<redacted>}", token.toString());
 					assertFalse(token.toString().contains("synthetic"));
 				}));
@@ -92,13 +106,13 @@ final class SokletBearerTests {
 		Request request = Request.withRawUrl(HttpMethod.GET, "/resource")
 				.headers(Map.of("Proxy-Authorization", List.of("Bearer synthetic"),
 						"X-Authorization", List.of("Bearer synthetic"))).build();
-		assertTrue(SokletBearer.bearerTokenFor(request).isEmpty());
+		assertInstanceOf(BearerTokenResult.Absent.class, SokletBearer.bearerTokenResultFor(request));
 	}
 
 	@SuppressWarnings("NullAway") // Intentionally violates the required request contract.
 	@Test
 	void nullRequestFails() {
-		assertThrows(NullPointerException.class, () -> SokletBearer.bearerTokenFor(null));
+		assertThrows(NullPointerException.class, () -> SokletBearer.bearerTokenResultFor(null));
 	}
 
 	private static @NonNull Request request(@NonNull String name, @NonNull List<@NonNull String> values) {
@@ -106,10 +120,8 @@ final class SokletBearerTests {
 	}
 
 	private static void assertMalformed(@NonNull Request request) {
-		AccessTokenValidationException failure = assertThrows(AccessTokenValidationException.class,
-				() -> SokletBearer.bearerTokenFor(request));
-		assertEquals(AccessTokenValidationException.Reason.MALFORMED_REQUEST, failure.getReason());
-		assertEquals(BearerError.INVALID_REQUEST, failure.getBearerError());
+		BearerTokenResult.Malformed failure = assertInstanceOf(BearerTokenResult.Malformed.class,
+				SokletBearer.bearerTokenResultFor(request));
 		assertFalse(failure.toString().contains("synthetic"));
 	}
 }

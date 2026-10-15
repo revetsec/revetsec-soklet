@@ -44,7 +44,7 @@ class SokletScimM11Tests {
     }
     @Test void patchHelperBindsMemberIdsAndInvokesOneCoreOperation() {
         CountingObserver observer=new CountingObserver();ScimServiceProvider p=provider(observer);
-        ScimPatchRequest patch=assertInstanceOf(ScimPatchParseResult.Succeeded.class,SokletScim.patchRequestResultFor(p,GROUP,request(BODY))).getPatchRequest();
+        ScimPatchRequest patch=assertInstanceOf(ScimPatchParseResult.Succeeded.class,SokletTransportFixtures.completed(SokletScim.patchRequestResultFor(p,GROUP,request(BODY)))).getPatchRequest();
         assertSame(GROUP,patch.getResourceType());assertEquals(1,patch.getOperations().size());
         assertEquals(ScimPatchOperationType.ADD,patch.getOperations().get(0).getOperationType());
         assertEquals(1,observer.starts.get());assertEquals(1,observer.ends.get());
@@ -56,25 +56,25 @@ class SokletScimM11Tests {
         Request duplicate=SokletRawInputTests.fromPhysicalHeaders(HttpMethod.PATCH,"/scim/Groups/fixture",
                 List.of(Map.entry("Content-Type","application/scim+json"),Map.entry("content-type","application/scim+json")),BODY.getBytes(StandardCharsets.UTF_8));
         assertSame(ScimError.unsupportedMediaTypeInstance(),assertInstanceOf(ScimPatchParseResult.Rejected.class,
-                SokletScim.patchRequestResultFor(p,GROUP,duplicate)).getError());
+                SokletTransportFixtures.completed(SokletScim.patchRequestResultFor(p,GROUP,duplicate))).getError());
         Request unsupported=Request.withRawUrl(HttpMethod.PATCH,"/scim/Groups/fixture")
                 .headers(Map.of("Content-Type",List.of("text/plain"))).body(BODY.getBytes(StandardCharsets.UTF_8)).build();
         assertSame(ScimError.unsupportedMediaTypeInstance(),assertInstanceOf(ScimPatchParseResult.Rejected.class,
-                SokletScim.patchRequestResultFor(p,GROUP,unsupported)).getError());
+                SokletTransportFixtures.completed(SokletScim.patchRequestResultFor(p,GROUP,unsupported))).getError());
     }
     @Test void materializedMissingAndMalformedBodiesRemainCoreRejections() {
         ScimServiceProvider p=provider(ScimObserver.disabledInstance());
         Request missing=Request.withRawUrl(HttpMethod.PATCH,"/scim/Groups/fixture")
                 .headers(Map.of("Content-Type",List.of("application/scim+json"))).build();
-        assertInstanceOf(ScimPatchParseResult.Rejected.class,SokletScim.patchRequestResultFor(p,GROUP,missing));
+        assertInstanceOf(ScimPatchParseResult.Rejected.class,SokletTransportFixtures.completed(SokletScim.patchRequestResultFor(p,GROUP,missing)));
         assertSame(ScimError.invalidSyntaxInstance(),assertInstanceOf(ScimPatchParseResult.Rejected.class,
-                SokletScim.patchRequestResultFor(p,GROUP,request("{broken"))).getError());
+                SokletTransportFixtures.completed(SokletScim.patchRequestResultFor(p,GROUP,request("{broken")))).getError());
     }
     @Test @SuppressWarnings("NullAway") void requiredReferencesFailAsProgrammingErrors() {
         ScimServiceProvider p=provider(ScimObserver.disabledInstance());Request r=request(BODY);
-        assertThrows(NullPointerException.class,()->SokletScim.patchRequestResultFor(null,GROUP,r));
-        assertThrows(NullPointerException.class,()->SokletScim.patchRequestResultFor(p,null,r));
-        assertThrows(NullPointerException.class,()->SokletScim.patchRequestResultFor(p,GROUP,null));
+        assertThrows(NullPointerException.class,()->SokletTransportFixtures.completed(SokletScim.patchRequestResultFor(null,GROUP,r)));
+        assertThrows(NullPointerException.class,()->SokletTransportFixtures.completed(SokletScim.patchRequestResultFor(p,null,r)));
+        assertThrows(NullPointerException.class,()->SokletTransportFixtures.completed(SokletScim.patchRequestResultFor(p,GROUP,null)));
     }
     @ThreadSafe private static final class CountingObserver implements ScimObserver {
         private final @NonNull AtomicInteger starts=new AtomicInteger(), ends=new AtomicInteger();

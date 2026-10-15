@@ -17,11 +17,12 @@
 package com.revetsec.soklet;
 
 import com.revetsec.oauth.BearerToken;
+import com.revetsec.oauth.BearerTokenResult;
+import com.google.errorprone.annotations.CheckReturnValue;
 import com.soklet.Request;
 import org.jspecify.annotations.NonNull;
 
 import javax.annotation.concurrent.ThreadSafe;
-import java.util.Optional;
 
 /**
  * Raw Authorization-header transport for Soklet resource servers. Parsing a bearer credential grants no identity
@@ -38,20 +39,18 @@ public final class SokletBearer {
 	}
 
 	/**
-	 * Parses every materialized Authorization value, collecting field names case-insensitively without trimming or
-	 * splitting their contents. Only absent headers return empty. Query, body and cookies are never credential
-	 * transports here. All grammar and credential-size decisions remain in Revetsec core.
-	 * <p>
-	 * Soklet 4 exposes header values as lists, so identical physical duplicates and differently cased field names
-	 * remain ambiguous and are rejected by core.
+	 * Parses all materialized Authorization values as an absent, unverified present or malformed result.
+	 * Every materialized header value is retained, including identical duplicates and differently cased field names.
+	 * Query, body and cookies are never bearer transports. Core owns the credential grammar and size limit.
 	 *
 	 * @param request the resource request
-	 * @return an absent or unverified bearer credential
-	 * @throws com.revetsec.oauth.AccessTokenValidationException if core rejects the header input
+	 * @return the raw-header parsing outcome
 	 * @throws NullPointerException if request is null
 	 * @since 1.0.0
 	 */
-	public static @NonNull Optional<@NonNull BearerToken> bearerTokenFor(@NonNull Request request) {
-		return BearerToken.fromAuthorizationHeaderValues(SokletOAuth.collectHeaderValues(request, "Authorization"));
+	@CheckReturnValue
+	public static @NonNull BearerTokenResult bearerTokenResultFor(@NonNull Request request) {
+		return BearerToken.fromAuthorizationHeaderValuesResult(SokletOAuth.collectHeaderValues(request, "Authorization"));
 	}
+
 }
