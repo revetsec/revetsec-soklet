@@ -95,7 +95,7 @@ dependencies {
 
 This adapter is **pre-release**, like Revetsec core. The helpers use only public Revetsec APIs. OAuth callbacks retain raw query/body text and every distinct materialized Content-Type value. Bearer parsing retains every distinct materialized Authorization value and rejects ambiguity in core; it grants no identity or permission. Applications select validators and make scope/authorization decisions.
 
-Soklet represents header values as sets. Identical duplicate physical fields can be discarded before these helpers run, including fields with differently cased names. Your trusted HTTP edge must reject those duplicate Authorization and Content-Type fields; the adapter cannot recover discarded multiplicity.
+Soklet 4 represents header values as lists. These helpers collect every materialized occurrence, including identical duplicates and differently cased names, so core can reject ambiguous Authorization and Content-Type fields. The trusted HTTP edge remains responsible for framing, complete-request and header limits before materialization.
 
 Redirect helpers accept an absolute HTTP(S) URI without userinfo, reject unsafe URI text, and return 302 with no-store/no-referrer headers and optional application cookies. The app supplies the redirect URI. Core chooses and validates provider endpoints.
 
@@ -133,7 +133,7 @@ MarshaledResponse response = SokletOAuthAuthorizationServer.responseFor(prepared
 
 Use each helper on its configured route. Render interactions in the app and call core directly to resume/complete consent. Metadata/JWKS use `responseFor(server.metadataResponse(method))` and `responseFor(server.jsonWebKeySetResponse(method))`. Expected failures remain core results; typed infrastructure failures propagate for mapping with `server.responseForFailure(failure)`.
 
-`responseFor` preserves prepared bytes/status/headers and optional credential-bearing Location, bypassing JSON marshalling. Add app cookies separately and keep credential-bearing responses out of diagnostics. Header sets lose identical physical duplicates, including mixed-case names; reject forbidden physical duplicates and incomplete/oversized requests at the trusted edge. See core's unpublished self-issued MCP example for app-owned authentication and explicit volatile-storage qualification.
+`responseFor` preserves prepared bytes/status/headers and optional credential-bearing Location, bypassing JSON marshalling. Add app cookies separately and keep credential-bearing responses out of diagnostics. Soklet 4's header lists retain materialized multiplicity, including identical values and differently cased names; core rejects ambiguous protocol fields. Reject incomplete or oversized requests and enforce physical framing limits at the trusted edge. See core's unpublished self-issued MCP example for app-owned authentication and explicit volatile-storage qualification.
 
 SCIM schema/resource/query/response transport helpers are available through `SokletScim`. They preserve raw query/body data, physical header occurrences and prepared response bytes. The PATCH helper binds ordered operations through the core parser. See the core [SCIM server guide](../revetsec/docs/scim-server-primitives.md).
 
