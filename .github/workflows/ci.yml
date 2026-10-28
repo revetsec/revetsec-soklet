@@ -159,7 +159,7 @@ jobs:
           "$RUNNER_TEMP/amazon-corretto-21.0.11.10.1-linux-x64.tar.gz"
 
       - name: Set up Corretto 21.0.11 for the framework build
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: jdkfile
           java-version: '21.0.11'
@@ -199,7 +199,7 @@ jobs:
         run: mvn -B -ntp -f core/pom.xml -DskipTests -Dmaven.javadoc.skip=true install
 
       - name: Set up Corretto ${{ matrix.jdk }} for adapter tests
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: corretto
           java-version: ${{ matrix.jdk }}
@@ -253,7 +253,7 @@ jobs:
           "$RUNNER_TEMP/amazon-corretto-21.0.11.10.1-linux-x64.tar.gz"
 
       - name: Set up Corretto 21.0.11
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: jdkfile
           java-version: '21.0.11'
@@ -330,7 +330,7 @@ jobs:
           "$RUNNER_TEMP/amazon-corretto-21.0.11.10.1-linux-x64.tar.gz"
 
       - name: Set up Corretto 21.0.11 for Maven
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: jdkfile
           java-version: '21.0.11'
