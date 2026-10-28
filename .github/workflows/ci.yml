@@ -22,7 +22,7 @@ env:
   # This pushed commit contains the resource-validator, authorization-server, password, TOTP,
   # recovery-code, and WebAuthn APIs used by the adapter and its examples.
   # ==================================================================================================
-  REVETSEC_CORE_SHA: '29393b77c97390c1bca42b574d467745f6d08a85'
+  REVETSEC_CORE_SHA: '59d59383b51c697d3b2d13e726d6f8df7d81a2d4'
   # Soklet 4.0.0 is not published yet. This pushed commit includes default HEAD handling.
   SOKLET_SHA: '61d02245c745cedf8452a1fc0a13be96f9414a9b'
   SOKLET_JAR_SHA256: '56e37d0e8ef781822de1618595f43366df00bb29e7b486cdc5901623b83845a9'
