@@ -47,7 +47,7 @@ final class ExecutableNullabilityContractTests {
         Path compileLog = temporary.resolve("compile.log");
         try (java.io.OutputStream output = Files.newOutputStream(compileLog)) {
             assertEquals(0, java.util.Objects.requireNonNull(ToolProvider.getSystemJavaCompiler()).run(null, output, output,
-                    "--release", "17", "-proc:none", "-classpath", classpath, "-d", classes.toString(), checker.toString()),
+                    "--release", AdapterContract.SOURCE_RELEASE, "-proc:none", "-classpath", classpath, "-d", classes.toString(), checker.toString()),
                     () -> read(compileLog));
         }
         Path list = temporary.resolve("sources.txt");
@@ -57,6 +57,7 @@ final class ExecutableNullabilityContractTests {
         Path log = temporary.resolve("audit.log");
         Path result = temporary.resolve("result.json");
         Process audit = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                "-Drevetsec.source.release=" + AdapterContract.SOURCE_RELEASE,
                 "-classpath", classes + java.io.File.pathSeparator + classpath, "NullabilityAudit",
                 list.toString(), cp.toString(), result.toString()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
         try {

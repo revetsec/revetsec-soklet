@@ -22,6 +22,7 @@ import com.revetsec.oauth.OAuthException;
 import com.revetsec.oauth.AuthorizationResponseParseResult;
 import com.soklet.HttpMethod;
 import com.soklet.Request;
+import com.soklet.exception.IllegalRequestException;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DynamicTest;
@@ -92,11 +93,20 @@ final class SokletRawInputTests {
 	@TestFactory
 	@NonNull Stream<@NonNull DynamicTest> rawMimeGrammarAndCharsetRemainCoreDecisions() {
 		return Stream.of("text/plain", "application/json", "application/x-www-form-urlencoded; charset=ISO-8859-1",
-				"application/x-www-form-urlencoded; charset=UTF-8; charset=UTF-8",
 				"application/x-www-form-urlencoded; charset", "application/x-www-form-urlencoded; charset=\"UTF-8",
 				"application/x-www-form-urlencoded; boundary=" + "a".repeat(8_192))
 				.map(field -> DynamicTest.dynamicTest("invalid MIME length " + field.length(),
 						() -> assertMalformed(SokletOAuthTests.post("/callback", "code=a&state=b", field))));
+	}
+
+	@Test
+	void duplicateCharsetIsRejectedBySokletBeforeTheAdapterRuns() {
+		String field = "application/x-www-form-urlencoded; charset=UTF-8; charset=UTF-8";
+		assertThrows(IllegalRequestException.class,
+				() -> SokletOAuthTests.post("/callback", "code=a&state=b", field));
+		assertInstanceOf(AuthorizationResponseParseResult.Rejected.class,
+				AuthorizationResponse.fromFormBodyResult("code=a&state=b".getBytes(StandardCharsets.UTF_8),
+						List.of(field), null));
 	}
 
 	@Test

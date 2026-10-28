@@ -619,7 +619,7 @@ final class ContractSupport {
 	}
 
 	/**
-	 * Parses and attributes every Java file under {@code sourceRoot} with javac ({@code --release 17}, no annotation
+	 * Parses and attributes every Java file under {@code sourceRoot} with javac (the adapter's source release, no annotation
 	 * processing) and applies {@code function} to the result. Compilation errors fail the calling test.
 	 * <p>
 	 * The class path holds the provided-scope JARs only: the annotations, Revetsec core and the framework API. When
@@ -636,7 +636,7 @@ final class ContractSupport {
 		Assertions.assertNotNull(compiler, "Contract tests require a full JDK (javax.tools.JavaCompiler)");
 		DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
 
-		List<String> options = new ArrayList<>(List.of("--release", "17", "-proc:none", "-implicit:none",
+		List<String> options = new ArrayList<>(List.of("--release", AdapterContract.SOURCE_RELEASE, "-proc:none", "-implicit:none",
 				"-Xlint:none", "-classpath", analysisClasspath()));
 		if (stubRoot != null)
 			options.addAll(List.of("-sourcepath", stubRoot.toString()));

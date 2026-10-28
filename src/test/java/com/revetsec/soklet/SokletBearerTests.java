@@ -80,12 +80,25 @@ final class SokletBearerTests {
 
 	@TestFactory
 	@NonNull Stream<@NonNull DynamicTest> malformedFieldsRemainFixedInvalidRequestVerdicts() {
-		return Stream.of("", " ", "Basic synthetic", "Bearer", "Bearer ", "Bearer\tsynthetic", " Bearer synthetic",
-				"Bearer synthetic ", "Bearer a b", "Bearer a,b", "Bearer a=tail", "Bearer =", "Bearer ü",
+		return Stream.of("", " ", "Basic synthetic", "Bearer", "Bearer ", "Bearer\tsynthetic",
+				"Bearer a b", "Bearer a,b", "Bearer a=tail", "Bearer =", "Bearer ü",
 				"Bearer synthetic\r\nInjected: value", "Bearer " + " ".repeat(58) + "synthetic",
 				"Bearer " + "a".repeat(65_537))
 				.map(field -> DynamicTest.dynamicTest("malformed field length " + field.length(),
 						() -> assertMalformed(request("Authorization", List.of(field)))));
+	}
+
+	@TestFactory
+	@NonNull Stream<@NonNull DynamicTest> sokletTrimsOuterHeaderWhitespaceBeforeMaterialization() {
+		return Stream.of(" Bearer synthetic", "Bearer synthetic ", "\tBearer synthetic\t")
+				.map(field -> DynamicTest.dynamicTest("outer header whitespace length " + field.length(), () -> {
+					Request request = request("Authorization", List.of(field));
+					assertEquals(List.of("Bearer synthetic"), SokletOAuth.collectHeaderValues(request, "Authorization"));
+					assertInstanceOf(BearerTokenResult.Present.class, SokletBearer.bearerTokenResultFor(request));
+					// Core still rejects malformed raw input; Soklet removes HTTP field-value OWS first.
+					assertInstanceOf(BearerTokenResult.Malformed.class,
+							BearerToken.fromAuthorizationHeaderValuesResult(List.of(field)));
+				}));
 	}
 
 	@Test

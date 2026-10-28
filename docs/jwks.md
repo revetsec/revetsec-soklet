@@ -193,3 +193,7 @@ Both variants return `application/jwk-set+json`, an ETag and public cache header
 Repeated `If-None-Match` values are combined as a comma-separated list. The combination is bounded at 8,192 characters; oversized input receives the core publisher's 400 response. Configure container or server header limits as appropriate for your application.
 
 The default cache lifetime is 60 seconds. `cacheLifetime(...)` accepts whole seconds from zero through one day; passing `null` restores the default. Select a lifetime that fits your key rotation policy. To rotate, construct a replacement publisher containing the active and retained verification keys and atomically replace the application's reference. Retain old public keys long enough for outstanding signatures and downstream caches. Key order is the supplied list order; changes to the document change its ETag.
+
+## Framework baseline
+
+These examples target Java 21 and Soklet 4.0.0 at pushed commit `61d02245c745cedf8452a1fc0a13be96f9414a9b`, including the default HEAD handling used by both variants. The framework JAR is built with Corretto 21.0.11 and verified against SHA-256 `56e37d0e8ef781822de1618595f43366df00bb29e7b486cdc5901623b83845a9`. See the [local build instructions](../CONTRIBUTING.md#local-build) while this framework release is unpublished. Revetsec core remains compatible with Java 17.

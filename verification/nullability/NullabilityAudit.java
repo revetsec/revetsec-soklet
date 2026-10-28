@@ -78,7 +78,7 @@ public final class NullabilityAudit {
         Audit audit = new Audit();
         try (var manager = compiler.getStandardFileManager(diagnostics, null, StandardCharsets.UTF_8)) {
             JavacTask task = (JavacTask) compiler.getTask(null, manager, diagnostics,
-                    List.of("-proc:none", "--release", "17", "-classpath", classpath), null,
+                    List.of("-proc:none", "--release", System.getProperty("revetsec.source.release", "21"), "-classpath", classpath), null,
                     manager.getJavaFileObjectsFromPaths(sources));
             List<CompilationUnitTree> units = new ArrayList<>();
             task.parse().forEach(units::add);

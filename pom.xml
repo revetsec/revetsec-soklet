@@ -56,7 +56,8 @@
 		     the commit pinned in .github/workflows/ci.yml, and scripts/verify-core-drift.py checks that the pinned
 		     core's version equals this property. Never override it on the command line. -->
 		<revetsec.version>1.0.0-SNAPSHOT</revetsec.version>
-		<!-- Owner-approved Soklet 4.0.0 baseline; application provides the framework artifact. -->
+		<!-- Soklet 4.0.0 requires Java 21. Until publication, CI source-builds the full commit and
+		     verifies the framework JAR checksum pinned in .github/workflows/ci.yml. -->
 		<soklet.version>4.0.0</soklet.version>
 
 		<!-- Build plugins (the same versions as Revetsec core) -->
@@ -108,7 +109,7 @@
 									<version>[3.9,)</version>
 								</requireMavenVersion>
 								<requireJavaVersion>
-									<version>[17,)</version>
+									<version>[21,)</version>
 								</requireJavaVersion>
 								<dependencyConvergence/>
 								<!-- Allow-list (plan 10.1): no compile, runtime or system dependencies at all, and the
@@ -143,7 +144,7 @@
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>${maven.compiler.plugin.version}</version>
 				<configuration>
-					<release>17</release>
+					<release>21</release>
 					<compilerArgs>
 						<arg>-parameters</arg>
 						<arg>-Xlint:all</arg>
@@ -207,7 +208,7 @@
 				<artifactId>maven-javadoc-plugin</artifactId>
 				<version>${maven.javadoc.plugin.version}</version>
 				<configuration>
-					<!-- Documentation uses a separately pinned JDK; compilation still targets 17. Core links use
+					<!-- Documentation uses a separately pinned JDK; compilation targets 21. Core links use
 					     its locally built index, with no documentation download during the build. -->
 					<javadocExecutable>${revetsec.javadoc.executable}</javadocExecutable>
 					<!-- Keep published package URLs stable despite the JAR's automatic module name. -->
@@ -232,8 +233,8 @@
 							<location>${project.basedir}/src/main/javadoc/links/jspecify-1.0.1</location>
 						</offlineLink>
 						<offlineLink>
-							<url>https://javadoc.io/static/com.soklet/soklet/3.5.1/com.soklet/</url>
-							<location>${project.basedir}/src/main/javadoc/links/soklet-3.5.1</location>
+							<url>https://javadoc.io/static/com.soklet/soklet/4.0.0/</url>
+							<location>${project.basedir}/src/main/javadoc/links/soklet-4.0.0</location>
 						</offlineLink>
 					</offlineLinks>
 					<quiet>true</quiet>
@@ -248,7 +249,7 @@
 					<linksource>true</linksource>
 					<show>public</show>
 					<bottom><![CDATA[Copyright 2026 <a href="https://www.revetware.com" target="_blank">Revetware LLC</a>.]]></bottom>
-					<source>17</source>
+					<source>21</source>
 					<failOnError>true</failOnError>
 					<overview>${project.basedir}/src/main/javadoc/overview.html</overview>
 				</configuration>
@@ -349,7 +350,7 @@
 
 		<!--
 			Static-analysis gate, as in Revetsec core. Run on JDK 21 (Error Prone requires JDK 21+ to run); the
-			release-17 target is unchanged. NullAway runs at ERROR with com.revetsec as the annotated package, over
+			release-21 target is unchanged. NullAway runs at ERROR with com.revetsec as the annotated package, over
 			main and test code. Setting annotationProcessorPaths keeps Soklet's own processor off the processor
 			path.
 

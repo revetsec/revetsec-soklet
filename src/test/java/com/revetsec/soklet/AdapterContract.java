@@ -23,9 +23,9 @@ import java.util.List;
 /**
  * The facts that differ between Revetsec's adapter repositories.
  * <p>
- * The other contract-test sources are the same in {@code revetsec-soklet}, {@code revetsec-servlet-jakarta} and
- * {@code revetsec-servlet-javax} apart from their package declaration, so a change to one can be copied to the
- * others unchanged.
+ * The contract tests share their rules with {@code revetsec-servlet-jakarta} and
+ * {@code revetsec-servlet-javax}. This adapter attributes sources at Java 21 to match Soklet 4;
+ * the Servlet adapters retain their Java 17 baseline.
  *
  * @author <a href="https://www.revetkn.com">Mark Allen</a>
  */
@@ -39,6 +39,9 @@ final class AdapterContract {
 	 * The first line of {@code NOTICE} and of the JAR's {@code META-INF/NOTICE}; also the POM {@code <name>}.
 	 */
 	static final String PRODUCT_NAME = "Revetsec Soklet Adapter";
+
+	/** The adapter's source and bytecode baseline, matching Soklet 4. */
+	static final String SOURCE_RELEASE = "21";
 
 	/**
 	 * Binary names of classes whose JARs the contract tests put on javac's class path, next to the annotation JARs,

@@ -2,8 +2,9 @@ name: CI
 
 # revetsec-soklet CI (plan §10.1, §10.3). Revetsec core is not on Maven Central yet, so every job that
 # needs it checks out revetsec/revetsec at the pinned commit in REVETSEC_CORE_SHA, installs it into the
-# runner's local Maven repository with -DskipTests -Dmaven.javadoc.skip=true, and builds this adapter
-# against it (Soklet's verify-soklet-candidate pattern). The pin moves only by pull request.
+# runner's local Maven repository with -DskipTests -Dmaven.javadoc.skip=true. Soklet 4 is also built
+# from the pinned upstream commit with Corretto 21.0.11 and its JAR checksum verified before use.
+# Both source pins move only by pull request.
 #
 # Every action is pinned to a full commit SHA; the trailing comment is the tag it was resolved from with
 # `git ls-remote`. Dependabot's github-actions entry keeps the pins current.
@@ -22,6 +23,9 @@ env:
   # these helpers, including the self-issued example.
   # ==================================================================================================
   REVETSEC_CORE_SHA: '30cf5833c4b784d205bbfc189815172da79de264'
+  # Soklet 4.0.0 is not published yet. This pushed commit includes default HEAD handling.
+  SOKLET_SHA: '61d02245c745cedf8452a1fc0a13be96f9414a9b'
+  SOKLET_JAR_SHA256: '56e37d0e8ef781822de1618595f43366df00bb29e7b486cdc5901623b83845a9'
 
 permissions:
   contents: read
@@ -122,7 +126,7 @@ jobs:
       # Do not cancel the other JDKs when one fails; every JDK's result is useful.
       fail-fast: false
       matrix:
-        jdk: ['17', '21', '25', '27']
+        jdk: ['21', '25', '27']
     steps:
       - name: Check out revetsec-soklet
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -149,19 +153,50 @@ jobs:
           path: core
           persist-credentials: false
 
-      - name: Set up Corretto ${{ matrix.jdk }}
+      - name: Set up Corretto 21.0.11 for the framework build
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: corretto
-          java-version: ${{ matrix.jdk }}
+          java-version: '21.0.11'
           cache: maven
 
-      # The Maven cache may hold a Revetsec core from an earlier run; build only against the pinned one.
+      - name: Check out Soklet at the framework pin
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: soklet/soklet
+          ref: ${{ env.SOKLET_SHA }}
+          path: soklet
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify the Soklet source pin
+        run: >-
+          python3 adapter/scripts/verify-soklet-baseline.py
+          --soklet-directory soklet --expected-commit "$SOKLET_SHA"
+          --expected-jar-sha256 "$SOKLET_JAR_SHA256"
+
+      - name: Remove cached Soklet artifacts
+        run: rm -rf ~/.m2/repository/com/soklet
+
+      - name: Build and install checksum-pinned Soklet
+        run: |
+          mvn -B -ntp -f soklet/pom.xml -DskipTests -Dmaven.javadoc.skip=true clean install
+          python3 adapter/scripts/verify-soklet-baseline.py \
+            --soklet-directory soklet --expected-commit "$SOKLET_SHA" \
+            --expected-jar-sha256 "$SOKLET_JAR_SHA256" --jar soklet/target/soklet-4.0.0.jar
+
+      # The Maven cache may hold an earlier core; build only against the pinned one.
       - name: Remove cached Revetsec artifacts
         run: rm -rf ~/.m2/repository/com/revetsec
 
       - name: Install Revetsec core at the pin
         run: mvn -B -ntp -f core/pom.xml -DskipTests -Dmaven.javadoc.skip=true install
+
+      - name: Set up Corretto ${{ matrix.jdk }} for adapter tests
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: corretto
+          java-version: ${{ matrix.jdk }}
 
       - name: Verify
         run: mvn -B -ntp -f adapter/pom.xml -Dmaven.javadoc.skip=true verify
@@ -175,7 +210,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  # Gating. Error Prone + NullAway and SpotBugs + FindSecBugs need JDK 21; the release target stays 17.
+  # Gating. Error Prone + NullAway and SpotBugs + FindSecBugs use JDK 21, matching the release target.
   static-analysis:
     name: Static Analysis (JDK 21)
     runs-on: ubuntu-24.04
@@ -206,12 +241,37 @@ jobs:
           path: core
           persist-credentials: false
 
-      - name: Set up Corretto 21
+      - name: Set up Corretto 21.0.11
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: corretto
-          java-version: '21'
+          java-version: '21.0.11'
           cache: maven
+
+      - name: Check out Soklet at the framework pin
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: soklet/soklet
+          ref: ${{ env.SOKLET_SHA }}
+          path: soklet
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify the Soklet source pin
+        run: >-
+          python3 adapter/scripts/verify-soklet-baseline.py
+          --soklet-directory soklet --expected-commit "$SOKLET_SHA"
+          --expected-jar-sha256 "$SOKLET_JAR_SHA256"
+
+      - name: Remove cached Soklet artifacts
+        run: rm -rf ~/.m2/repository/com/soklet
+
+      - name: Build and install checksum-pinned Soklet
+        run: |
+          mvn -B -ntp -f soklet/pom.xml -DskipTests -Dmaven.javadoc.skip=true clean install
+          python3 adapter/scripts/verify-soklet-baseline.py \
+            --soklet-directory soklet --expected-commit "$SOKLET_SHA" \
+            --expected-jar-sha256 "$SOKLET_JAR_SHA256" --jar soklet/target/soklet-4.0.0.jar
 
       - name: Remove cached Revetsec artifacts
         run: rm -rf ~/.m2/repository/com/revetsec
@@ -252,11 +312,11 @@ jobs:
           path: core
           persist-credentials: false
 
-      - name: Set up Corretto 17 for Maven
+      - name: Set up Corretto 21.0.11 for Maven
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: corretto
-          java-version: '17'
+          java-version: '21.0.11'
           cache: maven
 
       - name: Install checksum-pinned Corretto 26 for Javadoc
@@ -264,6 +324,31 @@ jobs:
           bash adapter/.github/scripts/install-pinned-corretto-linux-x64.sh
           javadocJava "$RUNNER_TEMP" "$GITHUB_ENV"
           "$RUNNER_TEMP/adapter-javadoc-java-distribution.txt"
+
+      - name: Check out Soklet at the framework pin
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: soklet/soklet
+          ref: ${{ env.SOKLET_SHA }}
+          path: soklet
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify the Soklet source pin
+        run: >-
+          python3 adapter/scripts/verify-soklet-baseline.py
+          --soklet-directory soklet --expected-commit "$SOKLET_SHA"
+          --expected-jar-sha256 "$SOKLET_JAR_SHA256"
+
+      - name: Remove cached Soklet artifacts
+        run: rm -rf ~/.m2/repository/com/soklet
+
+      - name: Build and install checksum-pinned Soklet
+        run: |
+          mvn -B -ntp -f soklet/pom.xml -DskipTests -Dmaven.javadoc.skip=true clean install
+          python3 adapter/scripts/verify-soklet-baseline.py \
+            --soklet-directory soklet --expected-commit "$SOKLET_SHA" \
+            --expected-jar-sha256 "$SOKLET_JAR_SHA256" --jar soklet/target/soklet-4.0.0.jar
 
       - name: Remove cached Revetsec artifacts
         run: rm -rf ~/.m2/repository/com/revetsec

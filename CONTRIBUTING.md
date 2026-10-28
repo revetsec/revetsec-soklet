@@ -12,20 +12,25 @@ No contributor license agreement is required at this time.
 
 #### Local Build
 
-You need JDK 17 or newer (17.0.3 at minimum), Maven 3.9 or newer, and Python 3 for the drift check. The adapter targets Java 17 whichever JDK runs the build.
+You need JDK 21 or newer, Maven 3.9 or newer, Git and Python 3. The adapter targets Java 21, matching Soklet 4; Revetsec core retains its Java 17 baseline. The unpublished Soklet artifact is built with Corretto 21.0.11 before switching to another supported JDK for adapter tests.
 
-Revetsec core is not published yet, so install it from a checkout next to this one first:
+From this adapter checkout, build the exact pushed Soklet source and verify its JAR before building the adapter. Use a fresh sibling checkout for the framework baseline:
 
 ```shell
-$ export JAVA_HOME=/absolute/path/to/jdk-17
+$ export JAVA_HOME=/absolute/path/to/corretto-21.0.11
 $ export PATH="$JAVA_HOME/bin:$PATH"
+$ git clone https://github.com/soklet/soklet.git ../soklet-baseline
+$ git -C ../soklet-baseline checkout --detach 61d02245c745cedf8452a1fc0a13be96f9414a9b
+$ python3 scripts/verify-soklet-baseline.py --soklet-directory ../soklet-baseline --expected-commit 61d02245c745cedf8452a1fc0a13be96f9414a9b --expected-jar-sha256 56e37d0e8ef781822de1618595f43366df00bb29e7b486cdc5901623b83845a9
+$ mvn -B -ntp -f ../soklet-baseline/pom.xml -DskipTests -Dmaven.javadoc.skip=true clean install
+$ python3 scripts/verify-soklet-baseline.py --soklet-directory ../soklet-baseline --expected-commit 61d02245c745cedf8452a1fc0a13be96f9414a9b --expected-jar-sha256 56e37d0e8ef781822de1618595f43366df00bb29e7b486cdc5901623b83845a9 --jar ../soklet-baseline/target/soklet-4.0.0.jar
 $ mvn -B -ntp -f ../revetsec/pom.xml -DskipTests -Dmaven.javadoc.skip=true install
 $ mvn -B -ntp -Dmaven.javadoc.skip=true verify
 ```
 
-The second command compiles, runs every test (including the contract tests) and packages the JAR. Use `install` instead of `verify` to put `1.0.0-SNAPSHOT` into your local Maven repository.
+The final command compiles, runs every adapter test (including the contract tests) and packages the JAR. Use `install` instead of `verify` to put `1.0.0-SNAPSHOT` into your local Maven repository. The framework verifier rejects a different commit, source edits or untracked files, an unfetched upstream pin, wrong coordinates/Java baseline and a changed JAR. A build with a different toolchain may produce different bytes; do not update the checksum to bypass a mismatch.
 
-Ordinary test builds may skip Javadoc. Its dedicated gate runs Maven on Java17 and Javadoc on checksum-pinned Corretto26. First generate the pinned core documentation, then pass its local index to the adapter:
+Ordinary test builds may skip Javadoc. Its dedicated gate runs Maven on Java 21 and Javadoc on checksum-pinned Corretto 26. First generate the pinned core documentation, then pass its local index to the adapter:
 
 ```shell
 $ export REVETSEC_JAVADOC_HOME=/absolute/path/to/pinned-corretto-26
@@ -41,11 +46,12 @@ CI runs these checks on every pull request. Run the ones your change affects bef
 
 | Check | JDK | Command |
 | --- | --- | --- |
-| Build and tests | 17, 21, 25, 27 | `mvn -B -ntp -Dmaven.javadoc.skip=true verify` |
+| Build and tests | 21, 25, 27 | `mvn -B -ntp -Dmaven.javadoc.skip=true verify` |
 | Error Prone, NullAway and SpotBugs | 21 | `mvn -B -ntp -Dmaven.javadoc.skip=true -Pstatic-analysis,spotbugs verify` |
-| Warnings-fatal Javadoc | Maven17 / Javadoc26 | `mvn -B -ntp -DskipTests -Dmaven.javadoc.failOnWarnings=true verify` with the local core index |
+| Warnings-fatal Javadoc | Maven 21 / Javadoc 26 | `mvn -B -ntp -DskipTests -Dmaven.javadoc.failOnWarnings=true verify` with the local core index |
 | Drift from core | none | `python3 scripts/verify-core-drift.py --core-directory ../revetsec` |
 | Drift-check self-tests | none | `python3 -m unittest discover -s scripts -p 'test_*.py'` |
+| Framework source/JAR pin | 21.0.11 for framework build | `python3 scripts/verify-soklet-baseline.py` with the source/checksum arguments above |
 
 The build's contract tests enforce the conventions in [NAMING_CONVENTIONS.md](NAMING_CONVENTIONS.md), the adapter's single package and its use of core's public API only, a list of banned source constructs, and the wording of the documentation. `ClaimsLintTests` rejects unsupported claims in any Markdown file. If it flags wording you wrote, rephrase it. An entry in `claims-allowlist.txt` is for wording that has evidence behind it, and each entry states that evidence.
 
@@ -61,9 +67,13 @@ The current pin contains the pure raw-input APIs needed by these helpers. Each p
 
 A core change that breaks this adapter lands as a pair: this adapter's pull request pins the core pull request's head SHA, and after both merge the pin moves to the merged core commit.
 
+#### The Pinned Framework
+
+Every Maven CI job checks out `soklet/soklet` at `SOKLET_SHA`, verifies that the full commit is on a fetched upstream branch, removes cached framework artifacts, and source-builds it with Corretto 21.0.11. The built JAR must match `SOKLET_JAR_SHA256` before adapter compilation begins. Move both pins together after verifying the upstream source and artifact; never use a mutable branch/tag or depend on an unpublished artifact resolving from Maven Central. The test matrix then switches to Java 21, 25 or 27. Core and adapter source releases remain 17 and 21 respectively.
+
 #### Code Conventions
 
-- Java 17 language level; tabs for indentation.
+- Java 21 language level; tabs for indentation.
 - Every Java source file and script starts with the Apache License 2.0 header that names `Copyright 2026 Revetware LLC.`, as in the existing files.
 - Public API follows [NAMING_CONVENTIONS.md](NAMING_CONVENTIONS.md). Helpers are static classes with a private constructor and verb or noun methods. There are no public records. Every reference parameter and return type carries explicit JSpecify nullness annotations, including internal/private methods and nested reference types; primitive and void types have no nullability. Every public element follows the API annotation contract, every exported type carries exactly one of `@ThreadSafe`, `@NotThreadSafe` or `@Immutable`, and every public member has `@since`.
 - Helpers contain no protocol logic. They pass raw input to Revetsec core through its public API and never use `com.revetsec.internal`.

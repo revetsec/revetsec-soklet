@@ -308,7 +308,8 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn('javadocJava "$RUNNER_TEMP" "$GITHUB_ENV"', job)
         self.assertIn("-DskipTests", job)
         self.assertEqual(2, job.count("-Dmaven.javadoc.failOnWarnings=true"))
-        self.assertNotIn("-Dmaven.javadoc.skip=true", job)
+        documentation_steps = job[job.index("name: Build and install pinned core with its documentation index"):]
+        self.assertNotIn("-Dmaven.javadoc.skip=true", documentation_steps)
         self.assertIn("-f core/pom.xml", job)
         self.assertIn("clean install", job)
         self.assertIn("$GITHUB_WORKSPACE/core/target/reports/apidocs", job)
@@ -321,7 +322,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("python3 -m unittest discover -s adapter/scripts", self.jobs()["drift"])
 
     def test_builds_on_every_supported_jdk(self):
-        self.assertIn("jdk: ['17', '21', '25', '27']", self.jobs()["test"])
+        self.assertIn("jdk: ['21', '25', '27']", self.jobs()["test"])
 
     def test_every_action_is_pinned_to_a_commit(self):
         uses = re.findall(r"uses: ([^\s]+)", self.workflow)
