@@ -16,8 +16,10 @@
 
 import hashlib
 import importlib.util
+import os
 from pathlib import Path
 import re
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -127,14 +129,23 @@ class WorkflowBaselineTests(unittest.TestCase):
             self.assertEqual(1, self.workflow.count(variable + ":"))
 
     def test_every_build_installs_verified_framework_on_fixed_jdk_first(self):
+        archive = "amazon-corretto-21.0.11.10.1-linux-x64.tar.gz"
+        download = "bash adapter/.github/scripts/download-pinned-corretto21-linux-x64.sh"
+        runner_archive = '"$RUNNER_TEMP/' + archive + '"'
+        setup_archive = "jdk-file: ${{ runner.temp }}/" + archive
         for name in ("test", "static-analysis", "javadoc"):
             job = self.jobs[name]
             with self.subTest(job=name):
                 self.assertEqual(1, job.count("repository: soklet/soklet"))
                 self.assertIn("ref: ${{ env.SOKLET_SHA }}", job)
                 self.assertIn("fetch-depth: 0", job)
-                self.assertIn("java-version: '21.0.11'", job)
-                self.assertLess(job.index("java-version: '21.0.11'"), job.index("-f soklet/pom.xml"))
+                self.assertEqual(1, job.count(download))
+                self.assertEqual(1, job.count(runner_archive))
+                self.assertEqual(1, job.count(setup_archive))
+                self.assertIn("distribution: jdkfile\n          java-version: '21.0.11'\n          " + setup_archive, job)
+                self.assertLess(job.index(download), job.index(runner_archive))
+                self.assertLess(job.index(runner_archive), job.index("distribution: jdkfile"))
+                self.assertLess(job.index(setup_archive), job.index("-f soklet/pom.xml"))
                 self.assertLess(job.index("name: Verify the Soklet source pin"), job.index("-f soklet/pom.xml"))
                 self.assertLess(job.index("rm -rf ~/.m2/repository/com/soklet"), job.index("-f soklet/pom.xml"))
                 self.assertLess(job.index("-f soklet/pom.xml"), job.index("--jar soklet/target/soklet-4.0.0.jar"))
@@ -142,6 +153,41 @@ class WorkflowBaselineTests(unittest.TestCase):
         job = self.jobs["test"]
         self.assertLess(job.index("--jar soklet/target/soklet-4.0.0.jar"),
                         job.index("name: Set up Corretto ${{ matrix.jdk }} for adapter tests"))
+
+    def test_pinned_corretto_archive_is_checked_before_setup(self):
+        helper = SCRIPTS.parent / ".github/scripts/download-pinned-corretto21-linux-x64.sh"
+        source = helper.read_text()
+        self.assertIn("archive=amazon-corretto-21.0.11.10.1-linux-x64.tar.gz", source)
+        self.assertIn("sha256=5b4dc8817df13f88f9bfc434e5d018adb535889ff2fe0ccf758bcebcc216f394", source)
+        self.assertIn("url=https://corretto.aws/downloads/resources/21.0.11.10.1/$archive", source)
+        self.assertIn("sha256sum --check --strict", source)
+        self.assertLess(source.index("curl --proto"), source.index("sha256sum --check --strict"))
+        self.assertEqual(0, subprocess.run(["bash", "-n", str(helper)], check=False).returncode)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            archive = Path(temporary) / "amazon-corretto-21.0.11.10.1-linux-x64.tar.gz"
+            for destination in ("relative/" + archive.name, str(Path(temporary) / "wrong.tar.gz")):
+                with self.subTest(destination=destination):
+                    result = subprocess.run(["bash", str(helper), destination], check=False,
+                                            capture_output=True, text=True)
+                    self.assertNotEqual(0, result.returncode)
+            archive.write_bytes(b"already exists")
+            result = subprocess.run(["bash", str(helper), str(archive)], check=False,
+                                    capture_output=True, text=True)
+            self.assertNotEqual(0, result.returncode)
+            self.assertEqual(b"already exists", archive.read_bytes())
+            archive.unlink()
+
+            fake_bin = Path(temporary) / "bin"
+            fake_bin.mkdir()
+            fake_curl = fake_bin / "curl"
+            fake_curl.write_text("#!/usr/bin/env bash\nprintf 'bad archive' > \"${@: -1}\"\n")
+            fake_curl.chmod(0o755)
+            environment = dict(os.environ, PATH=str(fake_bin) + os.pathsep + os.environ["PATH"])
+            result = subprocess.run(["bash", str(helper), str(archive)], check=False,
+                                    capture_output=True, text=True, env=environment)
+            self.assertNotEqual(0, result.returncode)
+            self.assertFalse(archive.exists(), "An archive with a bad checksum must be removed")
 
     def test_adapter_build_and_documentation_target_java21(self):
         pom = ET.parse(SCRIPTS.parent / "pom.xml").getroot()
