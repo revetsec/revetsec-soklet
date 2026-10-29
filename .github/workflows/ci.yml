@@ -4,6 +4,7 @@ name: CI
 # needs it checks out revetsec/revetsec at the pinned commit in REVETSEC_CORE_SHA, installs it into the
 # runner's local Maven repository with -DskipTests -Dmaven.javadoc.skip=true. Soklet 4 is also built
 # from the pinned upstream commit with a checksum-pinned Corretto 21.0.11 and its JAR checksum verified before use.
+# Its source build skips release signing; CI consumes the verified test artifact without release signing keys.
 # Both source pins move only by pull request.
 #
 # Every action is pinned to a full commit SHA; the trailing comment is the tag it was resolved from with
@@ -159,7 +160,7 @@ jobs:
           "$RUNNER_TEMP/amazon-corretto-21.0.11.10.1-linux-x64.tar.gz"
 
       - name: Set up Corretto 21.0.11 for the framework build
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: jdkfile
           java-version: '21.0.11'
@@ -186,7 +187,7 @@ jobs:
 
       - name: Build and install checksum-pinned Soklet
         run: |
-          mvn -B -ntp -f soklet/pom.xml -DskipTests -Dmaven.javadoc.skip=true clean install
+          mvn -B -ntp -f soklet/pom.xml -DskipTests -Dmaven.javadoc.skip=true -Dgpg.skip=true clean install
           python3 adapter/scripts/verify-soklet-baseline.py \
             --soklet-directory soklet --expected-commit "$SOKLET_SHA" \
             --expected-jar-sha256 "$SOKLET_JAR_SHA256" --jar soklet/target/soklet-4.0.0.jar
@@ -199,7 +200,7 @@ jobs:
         run: mvn -B -ntp -f core/pom.xml -DskipTests -Dmaven.javadoc.skip=true install
 
       - name: Set up Corretto ${{ matrix.jdk }} for adapter tests
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: corretto
           java-version: ${{ matrix.jdk }}
@@ -209,7 +210,7 @@ jobs:
 
       - name: Upload test reports
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-reports-jdk-${{ matrix.jdk }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: adapter/target/surefire-reports
@@ -253,7 +254,7 @@ jobs:
           "$RUNNER_TEMP/amazon-corretto-21.0.11.10.1-linux-x64.tar.gz"
 
       - name: Set up Corretto 21.0.11
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: jdkfile
           java-version: '21.0.11'
@@ -280,7 +281,7 @@ jobs:
 
       - name: Build and install checksum-pinned Soklet
         run: |
-          mvn -B -ntp -f soklet/pom.xml -DskipTests -Dmaven.javadoc.skip=true clean install
+          mvn -B -ntp -f soklet/pom.xml -DskipTests -Dmaven.javadoc.skip=true -Dgpg.skip=true clean install
           python3 adapter/scripts/verify-soklet-baseline.py \
             --soklet-directory soklet --expected-commit "$SOKLET_SHA" \
             --expected-jar-sha256 "$SOKLET_JAR_SHA256" --jar soklet/target/soklet-4.0.0.jar
@@ -330,7 +331,7 @@ jobs:
           "$RUNNER_TEMP/amazon-corretto-21.0.11.10.1-linux-x64.tar.gz"
 
       - name: Set up Corretto 21.0.11 for Maven
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: jdkfile
           java-version: '21.0.11'
@@ -363,7 +364,7 @@ jobs:
 
       - name: Build and install checksum-pinned Soklet
         run: |
-          mvn -B -ntp -f soklet/pom.xml -DskipTests -Dmaven.javadoc.skip=true clean install
+          mvn -B -ntp -f soklet/pom.xml -DskipTests -Dmaven.javadoc.skip=true -Dgpg.skip=true clean install
           python3 adapter/scripts/verify-soklet-baseline.py \
             --soklet-directory soklet --expected-commit "$SOKLET_SHA" \
             --expected-jar-sha256 "$SOKLET_JAR_SHA256" --jar soklet/target/soklet-4.0.0.jar

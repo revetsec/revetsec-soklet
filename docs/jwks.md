@@ -63,7 +63,7 @@ public final class JwksApplication {
 
         JwksPublisher publisher = JwksPublisher
             .withKeys(List.of(prodKey, nonprodKey))
-            .cacheLifetime(Duration.ofHours(1))
+            .httpCacheMaxAge(Duration.ofHours(1))
             .build();
         JwksResource resource = new JwksResource(publisher);
 
@@ -192,7 +192,9 @@ Both variants return `application/jwk-set+json`, an ETag and public cache header
 
 Repeated `If-None-Match` values are combined as a comma-separated list. The combination is bounded at 8,192 characters; oversized input receives the core publisher's 400 response. Configure container or server header limits as appropriate for your application.
 
-The default cache lifetime is 60 seconds. `cacheLifetime(...)` accepts whole seconds from zero through one day; passing `null` restores the default. Select a lifetime that fits your key rotation policy. To rotate, construct a replacement publisher containing the active and retained verification keys and atomically replace the application's reference. Retain old public keys long enough for outstanding signatures and downstream caches. Key order is the supplied list order; changes to the document change its ETag.
+The default HTTP cache max-age is 60 seconds. `httpCacheMaxAge(...)` accepts whole seconds from zero through one day; passing `null` restores the default. It controls the outgoing `Cache-Control` max-age for downstream HTTP caches. It does not expire the immutable publisher snapshot or reload keys; calling `toJson()` by itself is unaffected. Select a max-age that fits your key rotation policy.
+
+To rotate, construct a replacement publisher containing the active and retained verification keys and atomically replace the application's reference. Retain old public keys long enough for outstanding signatures and downstream caches. Key order is the supplied list order; changes to the document change its ETag.
 
 ## Framework baseline
 

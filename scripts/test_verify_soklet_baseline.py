@@ -154,6 +154,14 @@ class WorkflowBaselineTests(unittest.TestCase):
         self.assertLess(job.index("--jar soklet/target/soklet-4.0.0.jar"),
                         job.index("name: Set up Corretto ${{ matrix.jdk }} for adapter tests"))
 
+    def test_framework_builds_skip_release_signing(self):
+        for name in ("test", "static-analysis", "javadoc"):
+            with self.subTest(job=name):
+                builds = re.findall(r"mvn [^\n]*-f soklet/pom\.xml[^\n]*", self.jobs[name])
+                self.assertEqual(1, len(builds))
+                self.assertIn("-Dgpg.skip=true", builds[0])
+                self.assertTrue(builds[0].endswith(" clean install"))
+
     def test_pinned_corretto_archive_is_checked_before_setup(self):
         helper = SCRIPTS.parent / ".github/scripts/download-pinned-corretto21-linux-x64.sh"
         source = helper.read_text()

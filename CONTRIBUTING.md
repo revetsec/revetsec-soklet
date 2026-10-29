@@ -22,13 +22,13 @@ $ export PATH="$JAVA_HOME/bin:$PATH"
 $ git clone https://github.com/soklet/soklet.git ../soklet-baseline
 $ git -C ../soklet-baseline checkout --detach 61d02245c745cedf8452a1fc0a13be96f9414a9b
 $ python3 scripts/verify-soklet-baseline.py --soklet-directory ../soklet-baseline --expected-commit 61d02245c745cedf8452a1fc0a13be96f9414a9b --expected-jar-sha256 56e37d0e8ef781822de1618595f43366df00bb29e7b486cdc5901623b83845a9
-$ mvn -B -ntp -f ../soklet-baseline/pom.xml -DskipTests -Dmaven.javadoc.skip=true clean install
+$ mvn -B -ntp -f ../soklet-baseline/pom.xml -DskipTests -Dmaven.javadoc.skip=true -Dgpg.skip=true clean install
 $ python3 scripts/verify-soklet-baseline.py --soklet-directory ../soklet-baseline --expected-commit 61d02245c745cedf8452a1fc0a13be96f9414a9b --expected-jar-sha256 56e37d0e8ef781822de1618595f43366df00bb29e7b486cdc5901623b83845a9 --jar ../soklet-baseline/target/soklet-4.0.0.jar
 $ mvn -B -ntp -f ../revetsec/pom.xml -DskipTests -Dmaven.javadoc.skip=true install
 $ mvn -B -ntp -Dmaven.javadoc.skip=true verify
 ```
 
-The final command compiles, runs every adapter test (including the contract tests) and packages the JAR. Use `install` instead of `verify` to put `1.0.0-SNAPSHOT` into your local Maven repository. The framework verifier rejects a different commit, source edits or untracked files, an unfetched upstream pin, wrong coordinates/Java baseline and a changed JAR. A build with a different toolchain may produce different bytes; do not update the checksum to bypass a mismatch.
+The framework build skips release signing because it supplies a checksum-verified dependency for adapter tests. The final command compiles, runs every adapter test (including the contract tests) and packages the JAR. Use `install` instead of `verify` to put `1.0.0-SNAPSHOT` into your local Maven repository. The framework verifier rejects a different commit, source edits or untracked files, an unfetched upstream pin, wrong coordinates/Java baseline and a changed JAR. A build with a different toolchain may produce different bytes; do not update the checksum to bypass a mismatch.
 
 Ordinary test builds may skip Javadoc. Its dedicated gate runs Maven on Java 21 and Javadoc on checksum-pinned Corretto 26. First generate the pinned core documentation, then pass its local index to the adapter:
 
