@@ -119,7 +119,10 @@ public final class SokletOAuthAuthorizationServer {
 
 	/**
 	 * Emits the exact prepared body, headers, status and optional credential-bearing Location without JSON
-	 * marshalling or redirect regeneration. Keep this response out of diagnostics; add app cookies at the edge.
+	 * marshalling or redirect regeneration. A bodyless prepared response remains absent rather than becoming
+	 * an explicit zero-byte body, so Soklet's default HEAD handling retains the prepared GET representation
+	 * length for metadata and JWKS without emitting a body.
+	 * Keep this response out of diagnostics; add app cookies at the edge.
 	 * @param response restricted core response, possibly containing credentials or personal data
 	 * @return exact-byte Soklet response
 	 * @throws NullPointerException if response is null
@@ -132,8 +135,11 @@ public final class SokletOAuthAuthorizationServer {
 		Map<String, List<String>> headers = new LinkedHashMap<>();
 		response.getHeaders().forEach((name, values) -> headers.put(name, List.copyOf(values)));
 		location.ifPresent(value -> headers.put("Location", List.of(value)));
-		return MarshaledResponse.withStatusCode(response.getStatusCode()).headers(headers)
-				.body(response.toHttpBodyWithCredentials()).build();
+		MarshaledResponse.Builder builder = MarshaledResponse.withStatusCode(response.getStatusCode()).headers(headers);
+		byte[] body = response.toHttpBodyWithCredentials();
+		if (body.length != 0)
+			builder.body(body);
+		return builder.build();
 	}
 
 	/** Lazy read-only views let core check occurrence/byte bounds before copying hostile header collections. */

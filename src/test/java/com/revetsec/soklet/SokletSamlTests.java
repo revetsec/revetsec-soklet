@@ -175,7 +175,7 @@ final class SokletSamlTests {
                 .signingKeys(List.of(generator.generateKeyPair().getPublic())).build();
         SamlServiceProvider sp = SamlServiceProvider.withEntityId("https://sp.example.test/")
                 .assertionConsumerServiceUrl(URI.create("https://sp.example.test/acs"))
-                .replayCache(InMemorySamlReplayCache.withLimit(clock, 8)).clock(clock).build();
+                .replayCache(InMemorySamlReplayCache.fromLimit(clock, 8)).clock(clock).build();
         SamlAuthenticationRequestResult.Prepared prepared = assertInstanceOf(
                 SamlAuthenticationRequestResult.Prepared.class, sp.beginAuthenticationResult(idp));
         Response response = SokletSaml.authenticationRedirect(prepared, Set.of());

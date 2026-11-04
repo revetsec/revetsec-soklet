@@ -135,13 +135,10 @@ final class SokletOAuthTests {
 	}
 
 	@TestFactory
-	@NonNull Stream<@NonNull DynamicTest> unsupportedCallbackMethodsAreApplicationMisuse() {
+	@NonNull Stream<@NonNull DynamicTest> unsupportedCallbackMethodsAreRejected() {
 		return Stream.of(HttpMethod.PUT, HttpMethod.PATCH, HttpMethod.DELETE, HttpMethod.HEAD, HttpMethod.OPTIONS)
-				.map(method -> DynamicTest.dynamicTest(method.name(), () -> {
-					IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
-							() -> parsed(SokletOAuth.authorizationResponseResultFor(Request.fromPath(method, "/callback"))));
-					assertEquals("OAuth callback route must use GET or POST", failure.getMessage());
-				}));
+				.map(method -> DynamicTest.dynamicTest(method.name(),
+						() -> assertMalformed(Request.fromPath(method, "/callback"))));
 	}
 
 	@TestFactory

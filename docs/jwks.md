@@ -61,6 +61,7 @@ public final class JwksApplication {
             .certificateChain(nonprodChain)
             .build();
 
+        // Share this immutable publisher across JWKS requests.
         JwksPublisher publisher = JwksPublisher
             .withKeys(List.of(prodKey, nonprodKey))
             .httpCacheMaxAge(Duration.ofHours(1))

@@ -6,7 +6,7 @@ Revetsec helpers for [Soklet](https://www.soklet.com) applications.
 
 ### What Is It?
 
-[Revetsec](https://github.com/revetsec/revetsec) is a zero-dependency Java library for OAuth 2.0 clients and resource servers, OpenID Connect relying parties, JOSE, SAML 2.0 service providers and SCIM 2.0 servers. Its core has no framework dependency: it parses raw query strings, form bodies and header values.
+[Revetsec](https://github.com/revetsec/revetsec) is a zero-dependency Java library for OAuth 2.0 clients and resource servers, OpenID Connect relying parties, JOSE, SAML 2.0 service providers (SPs) and SCIM 2.0 servers. Its core has no framework dependency: it parses raw query strings, form bodies and header values.
 
 This adapter connects the two. Its helpers pass a Soklet `Request` to Revetsec core as raw input, and turn Revetsec results into Soklet responses. They contain no protocol logic, and every validation decision is made by Revetsec core.
 
@@ -32,13 +32,13 @@ BearerTokenResult bearerResult = SokletBearer.bearerTokenResultFor(request);
 Response redirect = SokletOAuth.redirect(authorizationUri, responseCookies);
 ```
 
-The callback helper accepts GET or form POST and preserves a POST query alongside its raw body. Return 405 for other callback methods, including HEAD, before reading or consuming pending login state; Soklet may dispatch HEAD to a GET route. Configure trusted callback/provider URLs in the application. Handle a rejected parse as malformed input and an oversized outcome as a discarded request body. Pass the callback from a successful parse and the bound pending reference to the configured OAuth/OIDC client. The bearer parser exposes absent, malformed and present outcomes directly. A parsed bearer still requires access-token validation and an application permission check.
+The callback helper accepts GET or form POST and preserves a POST query alongside its raw body. Other methods, including HEAD, return `Rejected` before callback input is inspected, even when a body was discarded. Soklet may dispatch HEAD to a GET route. Return 405 with `Allow: GET, POST` from an explicit route guard when that is the application's method policy; the parser result itself is not an HTTP response. Do not load, consume or clear pending login state for unsupported methods. Configure trusted callback/provider URLs in the application. Handle a rejected parse as malformed input and an oversized outcome as a discarded request body. Pass the callback from a successful parse and the bound pending reference to the configured OAuth/OIDC client. The bearer parser exposes absent, malformed and present outcomes directly. A parsed bearer still requires access-token validation and an application permission check.
 
 ### SAML HTTP-POST logout
 
 Use `SokletSaml.postLogoutBindingResultFor(request)` on logout POST routes. It preserves the original form body, every Content-Type value and the raw query and delegates binding checks to core. The existing `postBindingResultFor` ACS helper remains response-only. A parsed logout message's kind selects core's `acceptLogoutRequestResult` or `completeLogoutResult`; parsing never authenticates a message.
 
-Configure the SP's `postSingleLogoutServiceUrl` and the approved IdP's `postSingleLogoutService` explicitly. Emit `beginPostLogoutResult` prepared requests with `logoutPostFormResponse(prepared, cspNonce)` and `respondToPostLogoutRequestResult` prepared responses with `logoutResponsePostFormResponse(prepared, cspNonce)`. The generic `postFormResponse` also accepts both logout forms. These helpers retain core's exact UTF-8 form and no-store response headers. The application sets CSP and cookies before delivery, persists browser-bound pending state for SP logout, and owns IdP selection and local session cleanup. A pending cookie on a cross-site POST callback requires Secure, HttpOnly and SameSite=None; a server-side pending store still requires a browser-specific binding secret.
+Configure `postSingleLogoutServiceUrl` on the SP and `postSingleLogoutService` on the approved identity provider (IdP) explicitly. Emit `beginPostLogoutResult` prepared requests with `logoutPostFormResponse(prepared, cspNonce)` and `respondToPostLogoutRequestResult` prepared responses with `logoutResponsePostFormResponse(prepared, cspNonce)`. The generic `postFormResponse` also accepts both logout forms. These helpers retain core's exact UTF-8 form and no-store response headers. The application sets CSP and cookies before delivery, persists browser-bound pending state for SP logout, and owns IdP selection and local session cleanup. A pending cookie on a cross-site POST callback requires Secure, HttpOnly and SameSite=None; a server-side pending store still requires a browser-specific binding secret.
 
 Only core-accepted logout requests release checked session selectors, and only completed responses establish protocol success. Handle rejected, unavailable and indeterminate results. Clear pending browser state after a verified terminal status or expiry; a rejected callback does not cancel a valid pending attempt. Custom pending stores must implement conditional atomic `consumeIfMatches`; the default fails closed without consuming. RelayState stays opaque and is never a redirect destination.
 
@@ -46,7 +46,10 @@ Only core-accepted logout requests release checked session selectors, and only c
 
 Adapter 1.x requires Revetsec core 1.0.0 or later and Java 21 or newer. Revetsec core itself retains its Java 17 baseline.
 
-Revetsec core and Soklet are `provided` dependencies of this adapter, so your application declares all three coordinates below. The tested framework baseline is Soklet 4.0.0, source-built from pushed commit `61d02245c745cedf8452a1fc0a13be96f9414a9b`, including its default HEAD handling. Until that release is published, follow the [pinned framework build instructions](CONTRIBUTING.md#local-build); CI verifies the source identity and framework JAR SHA-256 before building the adapter. The offline framework Javadoc index comes from that same Soklet 4 source.
+Revetsec core and Soklet are `provided` dependencies of this adapter, so your
+application declares all three coordinates below. This adapter targets Soklet
+4.0.0. Until that release is published, follow the
+[framework build instructions](CONTRIBUTING.md#local-build).
 
 **Nothing has been published yet, including snapshots.** After installing the pinned Soklet framework, install Revetsec core and then this adapter into your local Maven repository from their source checkouts, using JDK 21 or newer:
 
@@ -92,6 +95,19 @@ dependencies {
 }
 ```
 
+### Shared authoritative-store integration
+
+Use matching core and adapter versions for store-backed workflows. Implement
+core's store and recovery contracts in your application, including authoritative
+time, atomic transitions and recovery admission. Adapters translate HTTP input
+and prepared responses; they do not provide durable storage or a recovery controller.
+
+Handle an uncertain write separately from a confirmed transition whose output
+cannot be released. Both outcomes withhold credentials and authentication proof;
+neither permits replaying the operation to recover lost output. See the
+[shared-store contracts](https://github.com/revetsec/revetsec/blob/main/docs/shared-clock-stores.md)
+for result handling and coordinated recovery.
+
 ### Status
 
 This adapter is **pre-release**, like Revetsec core. The helpers use only public Revetsec APIs. OAuth callbacks retain raw query/body text and every distinct materialized Content-Type value. Bearer parsing retains every distinct materialized Authorization value and rejects ambiguity in core; it grants no identity or permission. Applications select validators and make scope/authorization decisions.
@@ -102,7 +118,7 @@ Soklet removes outer HTTP field-value spaces and tabs before exposing headers, a
 
 Redirect helpers accept an absolute HTTP(S) URI without userinfo, reject unsafe URI text, and return 302 with no-store/no-referrer headers and optional application cookies. The app supplies the redirect URI. Core chooses and validates provider endpoints.
 
-Revetsec has not been independently audited. That includes this adapter. Its security evidence is meant to be reproducible by anyone and will be listed in the [`docs/`](https://github.com/revetsec/revetsec/tree/main/docs) directory of the core repository as it is produced. Current evidence records its exact implementation and provider scope; later milestones remain in progress.
+Revetsec has not been independently audited. That includes this adapter.
 
 To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
@@ -136,7 +152,7 @@ MarshaledResponse response = SokletOAuthAuthorizationServer.responseFor(prepared
 
 Use each helper on its configured route. Render interactions in the app and call core directly to resume/complete consent. Metadata/JWKS use `responseFor(server.metadataResponse(method))` and `responseFor(server.jwksResponse(method))`. Expected failures remain core results; typed infrastructure failures propagate for mapping with `server.responseForFailure(failure)`.
 
-`responseFor` preserves prepared bytes/status/headers and optional credential-bearing Location, bypassing JSON marshalling. Add app cookies separately and keep credential-bearing responses out of diagnostics. Soklet 4's header lists retain materialized multiplicity, including identical values and differently cased names; core rejects ambiguous protocol fields. Reject incomplete or oversized requests and enforce physical framing limits at the trusted edge. See core's unpublished self-issued MCP example for app-owned authentication and explicit volatile-storage qualification.
+`responseFor` preserves prepared bytes/status/headers and optional credential-bearing Location, bypassing JSON marshalling. Prepared HEAD metadata/JWKS responses have no Soklet body object, retaining the core GET representation `Content-Length`, ETag and public cache headers through the pinned framework's default HEAD handling. Pass the actual request method to core, including when Soklet dispatches HEAD to a GET route; do not attach an empty byte array or regenerate the response body. GET still emits the exact prepared representation. Bodyless method rejections and redirects remain bodyless. Add app cookies separately and keep credential-bearing responses out of diagnostics. Soklet 4's header lists retain materialized multiplicity, including identical values and differently cased names; core rejects ambiguous protocol fields. Reject incomplete or oversized requests and enforce physical framing limits at the trusted edge. See the [self-issued MCP example](https://github.com/revetsec/revetsec/tree/main/examples/self-issued) for application-owned authentication and explicit in-memory storage configuration.
 
 SCIM schema/resource/query/response transport helpers are available through `SokletScim`. They preserve raw query/body data, physical header occurrences and prepared response bytes. The PATCH helper binds ordered operations through the core parser. See the core [SCIM server guide](https://github.com/revetsec/revetsec/blob/main/docs/scim-server-primitives.md).
 

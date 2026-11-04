@@ -49,27 +49,30 @@ public final class SokletOAuth {
 	/**
 	 * Parses a callback using the route's GET or POST method. GET supplies the unchanged raw query; POST supplies
 	 * the unchanged body, raw query and every materialized Content-Type value to core's form parser. No decoded
-	 * query or form map is used. This parsing grants no identity and does not validate pending transaction state.
+	 * query or form map is used. Other methods, including HEAD, return Rejected before callback input is
+	 * inspected, even if Soklet discarded a body. The application selects the HTTP response (for example,
+	 * a route-level 405) and must not load or consume pending login state for that rejection.
+	 * This parsing grants no identity and does not validate pending transaction state.
 	 * <p>
 	 * Soklet 4 preserves header values as lists. Every materialized occurrence, including identical physical
 	 * duplicates and differently cased names, is passed to core for ambiguity checks.
 	 *
 	 * @param request the application-routed callback request
 	 * @return parsed, rejected or oversized callback outcome
-	 * @throws IllegalArgumentException if the application route uses neither GET nor POST
 	 * @throws NullPointerException if request is null
 	 * @since 1.0.0
 	 */
 	public static @NonNull SokletOAuthCallbackResult authorizationResponseResultFor(@NonNull Request request) {
 		requireNonNull(request);
+		HttpMethod method = request.getHttpMethod();
+		if (method != HttpMethod.GET && method != HttpMethod.POST)
+			return SokletOAuthCallbackResult.fromRejected();
 		if (Boolean.TRUE.equals(request.isContentTooLarge()))
 			return SokletOAuthCallbackResult.fromTooLarge();
-		if (request.getHttpMethod() == HttpMethod.GET)
+		if (method == HttpMethod.GET)
 			return SokletOAuthCallbackResult.fromParseResult(AuthorizationResponse.fromQueryStringResult(request.getRawQuery().orElse("")));
-		if (request.getHttpMethod() == HttpMethod.POST)
-			return SokletOAuthCallbackResult.fromParseResult(AuthorizationResponse.fromFormBodyResult(bodyBytesFor(request),
-					collectHeaderValues(request, "Content-Type"), request.getRawQuery().orElse(null)));
-		throw new IllegalArgumentException("OAuth callback route must use GET or POST");
+		return SokletOAuthCallbackResult.fromParseResult(AuthorizationResponse.fromFormBodyResult(bodyBytesFor(request),
+				collectHeaderValues(request, "Content-Type"), request.getRawQuery().orElse(null)));
 	}
 
 	/**
