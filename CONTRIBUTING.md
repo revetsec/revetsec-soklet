@@ -20,10 +20,10 @@ From this adapter checkout, build the exact pushed Soklet source and verify its 
 $ export JAVA_HOME=/absolute/path/to/corretto-21.0.11
 $ export PATH="$JAVA_HOME/bin:$PATH"
 $ git clone https://github.com/soklet/soklet.git ../soklet-baseline
-$ git -C ../soklet-baseline checkout --detach 61d02245c745cedf8452a1fc0a13be96f9414a9b
-$ python3 scripts/verify-soklet-baseline.py --soklet-directory ../soklet-baseline --expected-commit 61d02245c745cedf8452a1fc0a13be96f9414a9b --expected-jar-sha256 56e37d0e8ef781822de1618595f43366df00bb29e7b486cdc5901623b83845a9
+$ git -C ../soklet-baseline checkout --detach 157fbe587e177e7332fcbaffe51e7a2138685bd2
+$ python3 scripts/verify-soklet-baseline.py --soklet-directory ../soklet-baseline --expected-commit 157fbe587e177e7332fcbaffe51e7a2138685bd2 --expected-jar-sha256 2ebff62b5ec1fd6d86761d8a894276a07efdaa12859badc8e376a2c1ca87960d
 $ mvn -B -ntp -f ../soklet-baseline/pom.xml -DskipTests -Dmaven.javadoc.skip=true -Dgpg.skip=true clean install
-$ python3 scripts/verify-soklet-baseline.py --soklet-directory ../soklet-baseline --expected-commit 61d02245c745cedf8452a1fc0a13be96f9414a9b --expected-jar-sha256 56e37d0e8ef781822de1618595f43366df00bb29e7b486cdc5901623b83845a9 --jar ../soklet-baseline/target/soklet-4.0.0.jar
+$ python3 scripts/verify-soklet-baseline.py --soklet-directory ../soklet-baseline --expected-commit 157fbe587e177e7332fcbaffe51e7a2138685bd2 --expected-jar-sha256 2ebff62b5ec1fd6d86761d8a894276a07efdaa12859badc8e376a2c1ca87960d --jar ../soklet-baseline/target/soklet-4.0.0.jar
 $ mvn -B -ntp -f ../revetsec/pom.xml -DskipTests -Dmaven.javadoc.skip=true install
 $ mvn -B -ntp -Dmaven.javadoc.skip=true verify
 ```

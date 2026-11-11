@@ -199,4 +199,4 @@ To rotate, construct a replacement publisher containing the active and retained 
 
 ## Framework baseline
 
-These examples target Java 21 and Soklet 4.0.0 at pushed commit `61d02245c745cedf8452a1fc0a13be96f9414a9b`, including the default HEAD handling used by both variants. The framework JAR is built with Corretto 21.0.11 and verified against SHA-256 `56e37d0e8ef781822de1618595f43366df00bb29e7b486cdc5901623b83845a9`. See the [local build instructions](../CONTRIBUTING.md#local-build) while this framework release is unpublished. Revetsec core remains compatible with Java 17.
+These examples target Java 21 and Soklet 4.0.0 at pushed commit `157fbe587e177e7332fcbaffe51e7a2138685bd2`, including the default HEAD handling used by both variants. The framework JAR is built with Corretto 21.0.11 and verified against SHA-256 `2ebff62b5ec1fd6d86761d8a894276a07efdaa12859badc8e376a2c1ca87960d`. See the [local build instructions](../CONTRIBUTING.md#local-build) while this framework release is unpublished. Revetsec core remains compatible with Java 17.

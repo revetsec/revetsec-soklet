@@ -16,6 +16,7 @@
 package com.revetsec.soklet;
 
 import com.google.errorprone.annotations.CheckReturnValue;
+import com.revetsec.BrowserBinding;
 import com.revetsec.oauth.server.OAuthAuthorizationResult;
 import com.revetsec.oauth.server.OAuthAuthorizationServer;
 import com.revetsec.oauth.server.OAuthIntrospectionResult;
@@ -62,7 +63,7 @@ public final class SokletOAuthAuthorizationServer {
 	 */
 	@CheckReturnValue
 	public static @NonNull SokletRequestResult<@NonNull OAuthAuthorizationResult> beginAuthorizationResultFor(@NonNull OAuthAuthorizationServer server,
-			@NonNull Request request, @NonNull String browserBinding) {
+			@NonNull Request request, @NonNull BrowserBinding browserBinding) {
 		requireNonNull(server); requireNonNull(request); requireNonNull(browserBinding);
 		if (Boolean.TRUE.equals(request.isContentTooLarge())) return SokletRequestResult.fromTooLarge();
 		return SokletRequestResult.fromResult(server.beginAuthorizationResult(request.getHttpMethod().name(), request.getRawQuery().orElse(null),

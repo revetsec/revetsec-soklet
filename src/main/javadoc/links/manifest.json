@@ -27,9 +27,9 @@
       "path": "soklet-4.0.0/element-list",
       "url": "https://javadoc.io/static/com.soklet/soklet/4.0.0/",
       "sha256": "91357759feeb990d128732f2ea22f15318ef9b17cac53b701619cb66209ceba8",
-      "source": "https://github.com/soklet/soklet/tree/61d02245c745cedf8452a1fc0a13be96f9414a9b",
-      "sourceCommit": "61d02245c745cedf8452a1fc0a13be96f9414a9b",
-      "generation": "Generated with Corretto 26 from the pinned source using mvn -DskipTests javadoc:javadoc; classpath Javadoc with no module header."
+      "source": "https://github.com/soklet/soklet/tree/157fbe587e177e7332fcbaffe51e7a2138685bd2",
+      "sourceCommit": "157fbe587e177e7332fcbaffe51e7a2138685bd2",
+      "generation": "Package names verified against the pinned source; index bytes match the prior Corretto 26 generation."
     }
   ]
 }

@@ -58,7 +58,7 @@ final class SokletIssuerHeadTests {
                 .clientRepository((id, budget) -> Optional.empty()).store(new ScriptedOAuthStore(CLOCK.instant())).clock(CLOCK)
                 .stateSealer(StateSealer.withActiveKey(SealingKey.fromBase64("test", "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=")).build())
                 .signingKeys(OAuthIssuerKeyProvider.fromSnapshot(OAuthIssuerKeySnapshot.withActiveKey(
-                        OAuthIssuerSigningKey.fromKeyPair("test-key", pair.getPrivate(), pair.getPublic()))
+                        OAuthIssuerSigningKey.fromRsaKeyPair("test-key", pair.getPrivate(), pair.getPublic()))
                         .generation("test-generation").publishedAt(CLOCK.instant().minusSeconds(120)).build()))
                 .grantPolicy((context, budget) -> OAuthAuthorizationDecision.withSubject(context.getSubject())
                         .authorizedScopesByResource(context.getAuthorizedScopesByResource()).build())
@@ -164,8 +164,7 @@ final class SokletIssuerHeadTests {
         var http = HttpServer.withPort(port).host("127.0.0.1").requestHandlerConcurrency(2).requestHandlerQueueCapacity(4).build();
         var config = SokletConfig.withHttpServer(http).resourceMethodResolver(ResourceMethodResolver.fromClasses(Set.of(Endpoints.class)))
                 .instanceProvider(provider(resource)).build();
-        try (Soklet soklet = Soklet.fromConfig(config)) {
-            soklet.start();
+        Soklet.run(config, () -> {
             for (String path : paths()) {
                 String endpoint = path.endsWith("metadata") ? "metadata" : "jwks";
                 var expected = prepared(server, endpoint, "GET"); byte[] representation = expected.toHttpBodyWithCredentials();
@@ -188,7 +187,7 @@ final class SokletIssuerHeadTests {
                     }
                 }
             }
-        }
+        });
         System.out.println("{\"status\":\"PASS\",\"profiles\":4,\"headResponses\":4,\"getResponses\":8,\"requests\":12,\"persistentConnections\":4,\"headBodiesAbsent\":true}");
     }
     private static @NonNull String line(@NonNull InputStream input) throws IOException {
