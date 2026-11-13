@@ -125,6 +125,12 @@ final class SokletOAuthAuthorizationServerTests {
   assertTrue(Objects.requireNonNull(response.getHeaders().get("Location")).iterator().next().startsWith(REDIRECT+"&code="));
   String location=prepared.getLocationWithCredentials().orElseThrow().toString();String code=location.substring(location.indexOf("code=")+5,location.indexOf("&state="));
   String form="grant_type=authorization_code&client_id=client&resource="+java.net.URLEncoder.encode(RESOURCE,StandardCharsets.UTF_8)+"&redirect_uri="+java.net.URLEncoder.encode(REDIRECT,StandardCharsets.UTF_8)+"&code="+code+"&code_verifier="+VERIFIER;
+  String asserted=form+"&client_assertion=header.payload.signature&client_assertion_type="
+   +java.net.URLEncoder.encode("urn:ietf:params:oauth:client-assertion-type:jwt-bearer",StandardCharsets.UTF_8);
+  var assertionRequest=post("/token",asserted.getBytes(StandardCharsets.UTF_8),fields());
+  var direct=assertInstanceOf(OAuthTokenResult.Rejected.class,s.tokenResult("POST",null,assertionRequest.getBody().orElseThrow(),rawFields(assertionRequest)));
+  var adapted=assertInstanceOf(OAuthTokenResult.Rejected.class,SokletTransportFixtures.completed(SokletOAuthAuthorizationServer.tokenResultFor(s,assertionRequest)));
+  assertEquals(OAuthServerException.Reason.INVALID_CLIENT,direct.getReason());same(direct.getResponse(),adapted.getResponse());
   var token=assertInstanceOf(OAuthTokenResult.Succeeded.class,SokletTransportFixtures.completed(SokletOAuthAuthorizationServer.tokenResultFor(s,post("/token",form.getBytes(StandardCharsets.UTF_8),fields())))).getResponse();
   assertArrayEquals(token.toHttpBodyWithCredentials(),body(SokletOAuthAuthorizationServer.responseFor(token)));
  }
