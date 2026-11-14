@@ -37,12 +37,12 @@ SPEC.loader.exec_module(VERIFIER)
 COMMIT = "a" * 40
 POM_OPEN = '<project xmlns="http://maven.apache.org/POM/4.0.0">'
 CORE_POM = POM_OPEN + """
-<groupId>com.revetsec</groupId><artifactId>revetsec</artifactId><version>1.0.0-SNAPSHOT</version>
+<groupId>com.revetsec</groupId><artifactId>revetsec</artifactId><version>1.0.0</version>
 </project>
 """
 ADAPTER_POM = POM_OPEN + """
-<groupId>com.revetsec</groupId><artifactId>revetsec-example</artifactId><version>1.0.0-SNAPSHOT</version>
-<properties><revetsec.version>1.0.0-SNAPSHOT</revetsec.version></properties>
+<groupId>com.revetsec</groupId><artifactId>revetsec-example</artifactId><version>1.0.0</version>
+<properties><revetsec.version>1.0.0</revetsec.version></properties>
 <dependencies><dependency><groupId>com.revetsec</groupId><artifactId>revetsec</artifactId>
 <version>${revetsec.version}</version><scope>provided</scope></dependency></dependencies>
 </project>
@@ -128,16 +128,16 @@ class CoreDriftTests(unittest.TestCase):
         self.assert_single_problem("builds com.revetsec:other")
 
     def test_rejects_a_version_mismatch(self):
-        self.write(self.core, "pom.xml", CORE_POM.replace("1.0.0-SNAPSHOT", "1.1.0-SNAPSHOT"))
+        self.write(self.core, "pom.xml", CORE_POM.replace("1.0.0", "1.1.0-SNAPSHOT"))
         self.assert_single_problem("Core checkout is version 1.1.0-SNAPSHOT")
 
     def test_rejects_an_unresolved_core_version(self):
-        self.write(self.core, "pom.xml", CORE_POM.replace("1.0.0-SNAPSHOT", "${revision}"))
+        self.write(self.core, "pom.xml", CORE_POM.replace("1.0.0", "${revision}"))
         with self.assertRaisesRegex(VERIFIER.DriftError, "literal"):
             self.problems()
 
     def test_rejects_a_dependency_that_bypasses_the_declared_version(self):
-        self.write(self.adapter, "pom.xml", ADAPTER_POM.replace("${revetsec.version}", "1.0.0-SNAPSHOT"))
+        self.write(self.adapter, "pom.xml", ADAPTER_POM.replace("${revetsec.version}", "1.0.0"))
         self.assert_single_problem("must use the version ${revetsec.version}")
 
     def test_rejects_a_core_dependency_that_is_not_provided(self):
@@ -257,7 +257,7 @@ class CoreDriftTests(unittest.TestCase):
             status = VERIFIER.main(["--core-directory", str(self.core), "--adapter-directory", str(self.adapter),
                                     "--expected-commit", COMMIT])
         self.assertEqual(0, status)
-        self.assertIn("No drift from Revetsec core com.revetsec:revetsec:1.0.0-SNAPSHOT at " + COMMIT, output.getvalue())
+        self.assertIn("No drift from Revetsec core com.revetsec:revetsec:1.0.0 at " + COMMIT, output.getvalue())
 
 
 class WorkflowTests(unittest.TestCase):

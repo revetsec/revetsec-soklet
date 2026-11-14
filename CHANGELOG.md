@@ -4,15 +4,14 @@ All notable changes to revetsec-soklet are recorded in this file.
 
 Each release gets a `## X.Y.Z (YYYY-MM-DD)` heading with Added, Changed, Fixed, Security and Migration Notes sections as needed. A security fix names its GHSA or CVE ID. Each release also states the minimum Revetsec core and Soklet versions it requires.
 
-- Raised the provided Soklet baseline to 4.0.0.
-- Added `SokletOAuthAuthorizationServer` raw issuer request helpers and exact-byte prepared response mapping.
+## 1.0.0 (2026-11-13)
 
-## Unreleased
-
-Nothing has been released. The version is `1.0.0-SNAPSHOT`, and there is no compatibility promise before 1.0.0.
+Requires Revetsec core 1.0.0, Soklet 4.0.0 and Java 21 or newer.
 
 ### Added
 
+- Raised the provided Soklet baseline to 4.0.0.
+- Added `SokletOAuthAuthorizationServer` raw issuer request helpers and exact-byte prepared response mapping.
 - Repository scaffold (milestone M0), with no adapter code yet:
   - a single-module Maven build for `com.revetsec:revetsec-soklet`, targeting Java 17, whose only non-test dependencies are Revetsec core, Soklet and annotation JARs, all `provided`;
   - the `com.revetsec.soklet` package;

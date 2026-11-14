@@ -4,7 +4,7 @@
 
 Pull requests and bug reports are welcomed. For enhancement pull requests, please ask first to save time! It's possible the proposed enhancement is outside the scope or design goals of the project.
 
-This adapter is pre-release and follows Revetsec core's API, which is still being designed, so please open an issue before starting any change that touches public API. A change that needs something new from core starts in the [core repository](https://github.com/revetsec/revetsec).
+This adapter's public API follows its 1.x compatibility policy, so please open an issue before starting a public-API change. A change that needs something new from core starts in the [core repository](https://github.com/revetsec/revetsec).
 
 Report suspected security vulnerabilities privately as described in [SECURITY.md](SECURITY.md), not in an issue or pull request.
 
@@ -12,23 +12,17 @@ No contributor license agreement is required at this time.
 
 #### Local Build
 
-You need JDK 21 or newer, Maven 3.9 or newer, Git and Python 3. The adapter targets Java 21, matching Soklet 4; Revetsec core retains its Java 17 baseline. The unpublished Soklet artifact is built with Corretto 21.0.11 before switching to another supported JDK for adapter tests.
+You need JDK 21 or newer, Maven 3.9 or newer, Git and Python 3. The adapter targets Java 21, matching Soklet 4; Revetsec core retains its Java 17 baseline. Soklet 4.0.0 resolves from Maven Central.
 
-From this adapter checkout, build the exact pushed Soklet source and verify its JAR before building the adapter. Use a fresh sibling checkout for the framework baseline:
+The build resolves Revetsec core 1.0.0 and Soklet 4.0.0 from Maven Central. To test a coordinated core change, install the matching core source first; otherwise run the adapter build directly:
 
 ```shell
-$ export JAVA_HOME=/absolute/path/to/corretto-21.0.11
+$ export JAVA_HOME=/absolute/path/to/jdk-21-or-newer
 $ export PATH="$JAVA_HOME/bin:$PATH"
-$ git clone https://github.com/soklet/soklet.git ../soklet-baseline
-$ git -C ../soklet-baseline checkout --detach 157fbe587e177e7332fcbaffe51e7a2138685bd2
-$ python3 scripts/verify-soklet-baseline.py --soklet-directory ../soklet-baseline --expected-commit 157fbe587e177e7332fcbaffe51e7a2138685bd2 --expected-jar-sha256 2ebff62b5ec1fd6d86761d8a894276a07efdaa12859badc8e376a2c1ca87960d
-$ mvn -B -ntp -f ../soklet-baseline/pom.xml -DskipTests -Dmaven.javadoc.skip=true -Dgpg.skip=true clean install
-$ python3 scripts/verify-soklet-baseline.py --soklet-directory ../soklet-baseline --expected-commit 157fbe587e177e7332fcbaffe51e7a2138685bd2 --expected-jar-sha256 2ebff62b5ec1fd6d86761d8a894276a07efdaa12859badc8e376a2c1ca87960d --jar ../soklet-baseline/target/soklet-4.0.0.jar
-$ mvn -B -ntp -f ../revetsec/pom.xml -DskipTests -Dmaven.javadoc.skip=true install
 $ mvn -B -ntp -Dmaven.javadoc.skip=true verify
 ```
 
-The framework build skips release signing because it supplies a checksum-verified dependency for adapter tests. The final command compiles, runs every adapter test (including the contract tests) and packages the JAR. Use `install` instead of `verify` to put `1.0.0-SNAPSHOT` into your local Maven repository. The framework verifier rejects a different commit, source edits or untracked files, an unfetched upstream pin, wrong coordinates/Java baseline and a changed JAR. A build with a different toolchain may produce different bytes; do not update the checksum to bypass a mismatch.
+The final command compiles, runs every adapter test (including the contract tests) and packages the JAR. Use `install` instead of `verify` to put `1.0.0` into your local Maven repository.
 
 Ordinary test builds may skip Javadoc. Its dedicated gate runs Maven on Java 21 and Javadoc on checksum-pinned Corretto 26. First generate the pinned core documentation, then pass its local index to the adapter:
 
@@ -51,7 +45,7 @@ CI runs these checks on every pull request. Run the ones your change affects bef
 | Warnings-fatal Javadoc | Maven 21 / Javadoc 26 | `mvn -B -ntp -DskipTests -Dmaven.javadoc.failOnWarnings=true verify` with the local core index |
 | Drift from core | none | `python3 scripts/verify-core-drift.py --core-directory ../revetsec` |
 | Drift-check self-tests | none | `python3 -m unittest discover -s scripts -p 'test_*.py'` |
-| Framework source/JAR pin | 21.0.11 for framework build | `python3 scripts/verify-soklet-baseline.py` with the source/checksum arguments above |
+| Published framework dependency | 21+ | Maven resolves `com.soklet:soklet:4.0.0` from Central |
 
 The build's contract tests enforce the conventions in [NAMING_CONVENTIONS.md](NAMING_CONVENTIONS.md), the adapter's single package and its use of core's public API only, a list of banned source constructs, and the wording of the documentation. `ClaimsLintTests` rejects unsupported claims in any Markdown file. If it flags wording you wrote, rephrase it. An entry in `claims-allowlist.txt` is for wording that has evidence behind it, and each entry states that evidence.
 
@@ -67,9 +61,9 @@ The current pin contains the pure raw-input APIs needed by these helpers. Each p
 
 A core change that breaks this adapter lands as a pair: this adapter's pull request pins the core pull request's head SHA, and after both merge the pin moves to the merged core commit.
 
-#### The Pinned Framework
+#### The Published Framework
 
-Every Maven CI job checks out `soklet/soklet` at `SOKLET_SHA`, verifies that the full commit is on a fetched upstream branch, removes cached framework artifacts, and source-builds it with Corretto 21.0.11. The built JAR must match `SOKLET_JAR_SHA256` before adapter compilation begins. Move both pins together after verifying the upstream source and artifact; never use a mutable branch/tag or depend on an unpublished artifact resolving from Maven Central. The test matrix then switches to Java 21, 25 or 27. Core and adapter source releases remain 17 and 21 respectively.
+Every Maven CI job resolves the literal `com.soklet:soklet:4.0.0` dependency from Maven Central. There is no Soklet source-commit pin or local framework build. The test matrix exercises Java 21, 25 and 27; core and adapter source releases remain 17 and 21 respectively.
 
 #### Code Conventions
 
@@ -83,3 +77,5 @@ Every Maven CI job checks out `soklet/soklet` at `SOKLET_SHA`, verifies that the
 #### Publishing
 
 Publishing is a project-owner operation, not the last step of an ordinary contributor build. Do not run `mvn deploy`. Releases are signed and published to Maven Central by the project owner, only together with or after the Revetsec core release they require. Snapshot builds are not published.
+
+The owner follows core's [release runbook](https://github.com/revetsec/revetsec/blob/main/RELEASING.md), including the guarded local bundle and pre-upload verification.

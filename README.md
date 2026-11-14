@@ -2,7 +2,7 @@
 
 Revetsec helpers for [Soklet](https://www.soklet.com) applications.
 
-**This adapter is pre-release.** OAuth callback/redirect, bearer parsing, issuer transport and SAML binding helpers are implemented; SCIM schema/resource/query/response and PATCH helpers are implemented. The version is `1.0.0-SNAPSHOT`, and there is no compatibility promise before 1.0.0.
+Version 1.0.0 is this adapter's first compatibility release. OAuth callback/redirect, bearer parsing, issuer transport and SAML binding helpers are implemented; SCIM schema/resource/query/response and PATCH helpers are implemented.
 
 ### What Is It?
 
@@ -47,16 +47,10 @@ Only core-accepted logout requests release checked session selectors, and only c
 Adapter 1.x requires Revetsec core 1.0.0 or later and Java 21 or newer. Revetsec core itself retains its Java 17 baseline.
 
 Revetsec core and Soklet are `provided` dependencies of this adapter, so your
-application declares all three coordinates below. This adapter targets Soklet
-4.0.0. Until that release is published, follow the
-[framework build instructions](CONTRIBUTING.md#local-build).
+application declares all three coordinates below. This adapter targets the
+published Soklet 4.0.0 release.
 
-**Nothing has been published yet, including snapshots.** After installing the pinned Soklet framework, install Revetsec core and then this adapter into your local Maven repository from their source checkouts, using JDK 21 or newer:
-
-```shell
-$ mvn -B -ntp -f revetsec/pom.xml -DskipTests -Dmaven.javadoc.skip=true install
-$ mvn -B -ntp -f revetsec-soklet/pom.xml -Dmaven.javadoc.skip=true install
-```
+Revetsec core, this adapter and Soklet 4.0.0 are distributed through Maven Central.
 
 #### Maven
 
@@ -64,12 +58,12 @@ $ mvn -B -ntp -f revetsec-soklet/pom.xml -Dmaven.javadoc.skip=true install
 <dependency>
   <groupId>com.revetsec</groupId>
   <artifactId>revetsec-soklet</artifactId>
-  <version>1.0.0-SNAPSHOT</version>
+  <version>1.0.0</version>
 </dependency>
 <dependency>
   <groupId>com.revetsec</groupId>
   <artifactId>revetsec</artifactId>
-  <version>1.0.0-SNAPSHOT</version>
+  <version>1.0.0</version>
 </dependency>
 <dependency>
   <groupId>com.soklet</groupId>
@@ -80,17 +74,14 @@ $ mvn -B -ntp -f revetsec-soklet/pom.xml -Dmaven.javadoc.skip=true install
 
 #### Gradle
 
-A Gradle build resolves locally installed snapshots only when `mavenLocal()` is among its repositories.
-
 ```groovy
 repositories {
-  mavenLocal()
   mavenCentral()
 }
 
 dependencies {
-  implementation 'com.revetsec:revetsec-soklet:1.0.0-SNAPSHOT'
-  implementation 'com.revetsec:revetsec:1.0.0-SNAPSHOT'
+  implementation 'com.revetsec:revetsec-soklet:1.0.0'
+  implementation 'com.revetsec:revetsec:1.0.0'
   implementation 'com.soklet:soklet:4.0.0'
 }
 ```
@@ -110,7 +101,7 @@ for result handling and coordinated recovery.
 
 ### Status
 
-This adapter is **pre-release**, like Revetsec core. The helpers use only public Revetsec APIs. OAuth callbacks retain raw query/body text and every distinct materialized Content-Type value. Bearer parsing retains every distinct materialized Authorization value and rejects ambiguity in core; it grants no identity or permission. Applications select validators and make scope/authorization decisions.
+Version 1.0.0 establishes this adapter's public compatibility baseline. The helpers use only public Revetsec APIs. OAuth callbacks retain raw query/body text and every distinct materialized Content-Type value. Bearer parsing retains every distinct materialized Authorization value and rejects ambiguity in core; it grants no identity or permission. Applications select validators and make scope/authorization decisions.
 
 Soklet 4 represents header values as lists. These helpers collect every materialized occurrence, including identical duplicates and differently cased names, so core can reject ambiguous Authorization and Content-Type fields. The OAuth callback helper returns its explicit `TooLarge` outcome when Soklet discarded a body. The issuer, SAML POST and SCIM body helpers return `SokletRequestResult<T>`: handle `TooLarge` before continuing, then inspect `Completed.getResult()` for the actual core protocol outcome. A discarded body never invokes the core operation. Map it to the application's oversized-request response. The trusted HTTP edge remains responsible for framing, complete-request and header limits before materialization.
 
@@ -124,7 +115,7 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ### Development Verification
 
-This adapter builds against Revetsec core and the pinned Soklet 4 framework from source. With the framework installed, `JAVA_HOME` pointing at JDK 21 or newer, and the core repository checked out next to this one:
+This adapter builds against Revetsec core and the published Soklet 4.0.0 artifact. With `JAVA_HOME` pointing at JDK 21 or newer and the core repository checked out next to this one:
 
 ```shell
 $ mvn -B -ntp -f ../revetsec/pom.xml -DskipTests -Dmaven.javadoc.skip=true install
@@ -152,7 +143,7 @@ MarshaledResponse response = SokletOAuthAuthorizationServer.responseFor(prepared
 
 Use each helper on its configured route. Render interactions in the app and call core directly to resume/complete consent. Metadata/JWKS use `responseFor(server.metadataResponse(method))` and `responseFor(server.jwksResponse(method))`. Expected failures remain core results; typed infrastructure failures propagate for mapping with `server.responseForFailure(failure)`.
 
-`responseFor` preserves prepared bytes/status/headers and optional credential-bearing Location, bypassing JSON marshalling. Prepared HEAD metadata/JWKS responses have no Soklet body object, retaining the core GET representation `Content-Length`, ETag and public cache headers through the pinned framework's default HEAD handling. Pass the actual request method to core, including when Soklet dispatches HEAD to a GET route; do not attach an empty byte array or regenerate the response body. GET still emits the exact prepared representation. Bodyless method rejections and redirects remain bodyless. Add app cookies separately and keep credential-bearing responses out of diagnostics. Soklet 4's header lists retain materialized multiplicity, including identical values and differently cased names; core rejects ambiguous protocol fields. Reject incomplete or oversized requests and enforce physical framing limits at the trusted edge. See the [self-issued MCP example](https://github.com/revetsec/revetsec/tree/main/examples/self-issued) for application-owned authentication and explicit in-memory storage configuration.
+`responseFor` preserves prepared bytes/status/headers and optional credential-bearing Location, bypassing JSON marshalling. Prepared HEAD metadata/JWKS responses have no Soklet body object, retaining the core GET representation `Content-Length`, ETag and public cache headers through Soklet 4.0.0's default HEAD handling. Pass the actual request method to core, including when Soklet dispatches HEAD to a GET route; do not attach an empty byte array or regenerate the response body. GET still emits the exact prepared representation. Bodyless method rejections and redirects remain bodyless. Add app cookies separately and keep credential-bearing responses out of diagnostics. Soklet 4's header lists retain materialized multiplicity, including identical values and differently cased names; core rejects ambiguous protocol fields. Reject incomplete or oversized requests and enforce physical framing limits at the trusted edge. See the [self-issued MCP example](https://github.com/revetsec/revetsec/tree/main/examples/self-issued) for application-owned authentication and explicit in-memory storage configuration.
 
 SCIM schema/resource/query/response transport helpers are available through `SokletScim`. They preserve raw query/body data, physical header occurrences and prepared response bytes. The PATCH helper binds ordered operations through the core parser. See the core [SCIM server guide](https://github.com/revetsec/revetsec/blob/main/docs/scim-server-primitives.md).
 
