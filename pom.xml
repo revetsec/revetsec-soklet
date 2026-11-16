@@ -88,7 +88,7 @@
 		<junit.jupiter.version>6.1.3</junit.jupiter.version>
 
 		<!-- Javadoc uses a separately pinned JDK and the locally built core index. CI overrides the sibling
-		     location for its checkout named core. The public URL is the first-release documentation target. -->
+		     location for its checkout named core. The public URL is the core Javadoc site. -->
 		<revetsec.javadoc.executable>${env.REVETSEC_JAVADOC_HOME}/bin/javadoc</revetsec.javadoc.executable>
 		<revetsec.core.javadoc.location>${project.basedir}/../revetsec/target/reports/apidocs</revetsec.core.javadoc.location>
 		<revetsec.spotbugs.excludeFilterFile>${project.basedir}/config/spotbugs-exclude.xml</revetsec.spotbugs.excludeFilterFile>
@@ -220,7 +220,7 @@
 					<detectOfflineLinks>false</detectOfflineLinks>
 					<offlineLinks>
 						<offlineLink>
-							<url>https://javadoc.io/static/com.revetsec/revetsec/1.0.0/</url>
+							<url>https://javadoc.revetsec.com/</url>
 							<location>${revetsec.core.javadoc.location}</location>
 						</offlineLink>
 						<offlineLink>
