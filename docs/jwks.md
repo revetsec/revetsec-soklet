@@ -23,7 +23,7 @@ import com.soklet.InstanceProvider;
 import com.soklet.MarshaledResponse;
 import com.soklet.Request;
 import com.soklet.ResourceMethodResolver;
-import com.soklet.SokletApplication;
+import com.soklet.Soklet;
 import com.soklet.SokletConfig;
 import com.soklet.annotation.GET;
 import com.soklet.annotation.HEAD;
@@ -83,7 +83,7 @@ public final class JwksApplication {
             .build();
 
         // Uses the default ResponseMarshaler, including default HEAD handling.
-        SokletApplication.run(config);
+        Soklet.run(config).awaitShutdown();
     }
 
     public static final class JwksResource {
@@ -109,7 +109,7 @@ public final class JwksApplication {
 }
 ```
 
-Soklet's default response marshaler preserves the prepared HEAD representation length and bodyless conditional responses. No custom `ResponseMarshaler` is needed for this variant. Use a Soklet build that includes the default HEAD handling fix; it is included in the current 4.0.0 development source. This example targets Java 21+ and the updated local Revetsec and Soklet 4 builds.
+Soklet 4.0.0's default response marshaler preserves the prepared HEAD representation length and bodyless conditional responses, so this variant needs no custom `ResponseMarshaler`. The example targets Java 21 or newer with Revetsec 1.0.0 and Soklet 4.0.0.
 
 Only the public key is required. `keyId`, `algorithm` and `certificateChain` are optional; omitted algorithms remain unspecified. The builder derives public JWK parameters from the key, validates a supplied algorithm against its key type, and snapshots the supplied certificate chain. The leaf certificate must match the public key. A supplied chain is checked for certificate order and signatures, and a certificate's key-usage extension must permit the appropriate signing or certificate-signing use. This does not perform PKIX trust validation or certificate validity-time checks.
 

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Download the exact compiler used for the checksum-pinned Soklet 4.0.0 JAR.
+# Download the exact compiler used for the Soklet 4.0.0 JAR on Maven Central.
 # actions/setup-java's Corretto resolver accepts only major versions, so CI
 # passes this verified archive to setup-java's jdkfile distribution instead.
 # SHA-256: https://github.com/corretto/corretto-21/releases/tag/21.0.11.10.1
