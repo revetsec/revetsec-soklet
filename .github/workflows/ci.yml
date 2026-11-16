@@ -21,7 +21,7 @@ env:
   # This pushed commit contains the resource-validator, authorization-server, password, TOTP,
   # recovery-code, and WebAuthn APIs used by the adapter and its examples.
   # ==================================================================================================
-  REVETSEC_CORE_SHA: 'bbbefdbab8e80d0349f01a7b2b3c8525d248625e'
+  REVETSEC_CORE_SHA: '31bace2b07ae03d06ff0c099ca2380b87fbd82fa'
 
 permissions:
   contents: read
