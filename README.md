@@ -15,6 +15,7 @@ Implemented static helpers:
 - `SokletOAuth`: the authorization response of an OAuth or OpenID Connect callback, from a GET query or a POST form, and redirect responses with `Cache-Control: no-store` and `Referrer-Policy: no-referrer`
 - `SokletBearer`: a request's bearer parse result (absent, unverified present or malformed), for resource servers such as MCP endpoints
 - `SokletOAuthAuthorizationServer`: raw authorization, token, revocation and introspection input and exact-byte core response mapping
+- `SokletBrowserRequestOrigins`: method plus materialized `Sec-Fetch-Site`/`Origin` extraction for core's browser request-origin policy
 
 `SokletSaml` passes the original ACS POST body, Content-Type header multiplicity and raw
 Redirect query to core result parsers. Its outbound Redirect helpers take core-prepared
@@ -41,6 +42,14 @@ Use `SokletSaml.postLogoutBindingResultFor(request)` on logout POST routes. It p
 Configure `postSingleLogoutServiceUrl` on the SP and `postSingleLogoutService` on the approved identity provider (IdP) explicitly. Emit `beginPostLogoutResult` prepared requests with `logoutPostFormResponse(prepared, cspNonce)` and `respondToPostLogoutRequestResult` prepared responses with `logoutResponsePostFormResponse(prepared, cspNonce)`. The generic `postFormResponse` also accepts both logout forms. These helpers retain core's exact UTF-8 form and no-store response headers. The application sets CSP and cookies before delivery, persists browser-bound pending state for SP logout, and owns IdP selection and local session cleanup. A pending cookie on a cross-site POST callback requires Secure, HttpOnly and SameSite=None; a server-side pending store still requires a browser-specific binding secret.
 
 Only core-accepted logout requests release checked session selectors, and only completed responses establish protocol success. Handle rejected, unavailable and indeterminate results. Clear pending browser state after a verified terminal status or expiry; a rejected callback does not cancel a valid pending attempt. Custom pending stores must implement conditional atomic `consumeIfMatches`; the default fails closed without consuming. RelayState stays opaque and is never a redirect destination.
+
+### Browser request-origin admission
+
+Use `SokletBrowserRequestOrigins.browserRequestOriginResultFor(policy, request)` on browser-facing mutation routes.
+The helper installs no filter and changes no state. Core's policy is one admission layer, not a replacement for trusted
+host routing, current sessions, action/synchronizer tokens or authorization. Soklet exposes materialized header lists;
+if the trusted edge collapses physically identical duplicate fields before Soklet receives them, reject those at the
+edge.
 
 ### Installation
 

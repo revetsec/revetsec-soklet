@@ -160,7 +160,8 @@ final class SokletIssuerHeadTests {
     /** Optional private loopback rehearsal; excluded from ordinary unit-test socket requirements. */
     public static void main(java.lang.@NonNull String @NonNull [] arguments) throws Exception {
         var server = server(); var resource = new Endpoints(server); int port;
-        try (ServerSocket reservation = new ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))) { port = reservation.getLocalPort(); }
+        InetAddress loopback = InetAddress.getByAddress(new byte[]{127, 0, 0, 1});
+        try (ServerSocket reservation = new ServerSocket(0, 1, loopback)) { port = reservation.getLocalPort(); }
         var http = HttpServer.withPort(port).host("127.0.0.1").requestHandlerConcurrency(2).requestHandlerQueueCapacity(4).build();
         var config = SokletConfig.withHttpServer(http).resourceMethodResolver(ResourceMethodResolver.fromClasses(Set.of(Endpoints.class)))
                 .instanceProvider(provider(resource)).build();
@@ -168,16 +169,18 @@ final class SokletIssuerHeadTests {
             for (String path : paths()) {
                 String endpoint = path.endsWith("metadata") ? "metadata" : "jwks";
                 var expected = prepared(server, endpoint, "GET"); byte[] representation = expected.toHttpBodyWithCredentials();
-                try (Socket socket = new Socket("127.0.0.1", port)) {
+                try (Socket socket = new Socket(loopback, port)) {
                     socket.setSoTimeout(5_000); InputStream input = new BufferedInputStream(socket.getInputStream());
                     for (String method : List.of("GET", "HEAD", "GET")) {
                         socket.getOutputStream().write((method+" "+path+" HTTP/1.1\r\nHost: 127.0.0.1:"+port+"\r\nConnection: keep-alive\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
                         socket.getOutputStream().flush();
                         assertEquals("HTTP/1.1 200 OK", line(input));
-                        Map<String,List<String>> headers = new LinkedHashMap<>(); String field;
-                        while (!(field = line(input)).isEmpty()) {
+                        Map<String,List<String>> headers = new LinkedHashMap<>();
+                        String field = line(input);
+                        while (!field.isEmpty()) {
                             int colon = field.indexOf(':'); assertTrue(colon > 0);
                             headers.computeIfAbsent(field.substring(0,colon).toLowerCase(Locale.ROOT), ignored -> new ArrayList<>()).add(field.substring(colon+1).trim());
+                            field = line(input);
                         }
                         for (var header : expected.getHeaders().entrySet())
                             assertEquals(header.getValue(), headers.get(header.getKey().toLowerCase(Locale.ROOT)), header.getKey());
